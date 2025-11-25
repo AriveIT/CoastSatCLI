@@ -1,0 +1,22 @@
+# ADR 001: CLI Technology Stack
+
+- **Status:** Accepted
+- **Date:** 2025-11-21
+- **Context:**
+  - Analysts across the Canadian Coastal Change project need a consistent way to run CoastSat without diving into notebooks.
+  - Workstations are primarily Windows-based, and analysts already rely on Conda/Mamba for geospatial stacks.
+  - The workflow must be scriptable for batch processing but interactive enough to guide new users.
+- **Decision:**
+  - Build the user-facing interface as a Python CLI using [Typer](https://typer.tiangolo.com/) for commands/prompts.
+  - Reuse GeoPandas, Shapely, and CoastSat modules directly to avoid re-implementing geospatial logic.
+  - Keep the CLI in the same repo as the analysis scripts so shared utilities (`CLI/file_utils.py`, `CLI/geo_utils.py`) can evolve together.
+- **Consequences:**
+  - Pros:
+    - Consistent cross-platform experience with minimal dependencies beyond the existing Conda environment.
+    - Typer’s type hints/documentation improve discoverability and auto-generated help, aiding usability.
+    - Direct module reuse simplifies maintenance when CoastSat updates upstream logic.
+  - Cons:
+    - Command-line UX still intimidates some analysts; a GUI wrapper will be needed for broader adoption.
+    - Tight coupling to Python means we cannot easily embed the workflow in other languages/tools without additional wrappers.
+- **Notes:**
+  - Future ADRs will cover the planned desktop UI layered over the same Typer commands.

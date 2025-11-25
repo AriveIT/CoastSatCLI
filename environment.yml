@@ -1,0 +1,37 @@
+name: coastsat
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - geopandas
+  - gdal
+  - rasterio
+  - shapely
+  - numpy
+  - pandas
+  - scipy
+  - scikit-image
+  - matplotlib
+  - astropy
+  - notebook
+  - earthengine-api
+  - google-auth
+  - pyproj
+  - pytz
+  - pyfes
+  - pyyaml
+  - typer
+  - imageio
+  - imageio-ffmpeg
+  - pyqt
+  - scikit-learn
+  - joblib
+  - pip
+  - pytest
+  - tqdm
+  - requests
+  - fiona
+  - rtree
+  - gdown
+  - pip:
+    - typer-cli

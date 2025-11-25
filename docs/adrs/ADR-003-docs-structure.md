@@ -1,0 +1,23 @@
+# ADR 003: Dedicated Documentation Tree
+
+- **Status:** Accepted
+- **Date:** 2025-11-21
+- **Context:**
+  - The original README mixed installation steps, deep troubleshooting notes, and contributor guidance, making it unwieldy.
+  - Multiple audiences (analysts, developers, ops) need different levels of detail, and we plan to keep adding diagrams, ADRs, and ops guides.
+  - Future contributors need a clear home for architecture notes while we rework the pipeline.
+- **Decision:**
+  - Create a top-level `docs/` directory with subfolders for ADRs, architecture, ops, user guides, and developer documentation.
+  - Keep the root `ReadMe.md` focused on high-level onboarding and link into the relevant `docs/` topics for details.
+  - Seed placeholder documents to guide contributions and make sure every major topic has an obvious landing spot.
+- **Consequences:**
+  - Pros:
+    - Reduces README bloat and clarifies the intended audience of each document.
+    - Makes it easier to adopt doc tooling (MkDocs/Sphinx) later because the content is already structured.
+    - Encourages capturing architectural decisions as ADRs instead of burying them in commits.
+  - Cons:
+    - Contributors must keep multiple documents in sync until we automate doc publishing.
+    - Without enforcement, content could drift between README and docs; requires review discipline.
+- **Follow-up:**
+  - Decide on documentation tooling and publishing workflow (future ADR).
+  - Backfill each placeholder with real content as we refactor the pipeline.

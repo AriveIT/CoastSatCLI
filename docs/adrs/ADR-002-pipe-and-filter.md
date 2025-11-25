@@ -1,0 +1,23 @@
+# ADR 002: Pipe-and-Filter Workflow for CoastSatCLI
+
+- **Status:** Accepted
+- **Date:** 2025-11-21
+- **Context:**
+  - The original CoastSat workflow lived in notebooks with manual pauses between imagery download, shoreline detection, and tide correction.
+  - Canadian Coastal Change requires repeatable batch execution, provenance tracking, and the ability to rerun individual AOIs as inputs evolve.
+  - We want to expose the same processing stages to future automation (GUI, schedulers) without duplicating logic.
+- **Decision:**
+  - Treat the end-to-end workflow as a series of filters (configuration → imagery → shoreline detection → tide correction → reporting) with explicit input/output artifacts.
+  - Encode each filter in Python functions/modules that can be invoked independently while still composing into a “complete analysis” script today.
+  - Persist intermediate artifacts (metadata, cross-distance arrays, tide stats) so reruns can resume mid-pipeline.
+- **Consequences:**
+  - Pros:
+    - Easier to reason about usability improvements because each filter can expose progress and validations.
+    - Enables future modularization: toggling tide correction or adding QC filters becomes a config change instead of a separate script.
+    - Facilitates testing by allowing unit/integration tests per filter.
+  - Cons:
+    - Requires discipline to keep the data contracts between filters stable; breaking changes ripple across the pipeline.
+    - Short-term duplication (two main scripts) persists until refactors land, adding maintenance overhead.
+- **Related:**
+  - See `docs/architecture/complete-analysis.md` for the current stage breakdown.
+  - Future ADR planned for replacing the dual-script approach with a configurable pipeline runner.

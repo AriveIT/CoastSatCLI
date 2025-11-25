@@ -1,374 +1,200 @@
 # CoastSat Project Toolkit
 
-Automate shoreline extraction and analysis using CoastSat via a simple CLI.
+CoastSatCLI is a command-line interface that operationalizes CoastSat for the Canadian Coastal Change program. It helps researchers go from raw shoreline inputs to tide-corrected change metrics using a repeatable, automated workflow.
 
 ---
 
 ## Table of Contents
 
-1. [Overview](#overview)
-2. [Installation & Prerequisites](#installation--prerequisites) 
-3. [Quick Start](#quick-start)
-   3.1 [Initialize a Project](#31-initialize-a-project)
-   3.2 [Run the Complete Analysis](#32-run-the-complete-analysis)
-   3.3 [Inspect Output](#33-inspect-output)
-   3.4 [Rerun an Existing Project with Updated Inputs](#34-rerun-an-existing-project-with-updated-inputs)
-4. [CLI Commands](#cli-commands)
-5. [Settings File (settings.json)](#settings-file-settingsjson)
-6. [Directory Structure](#directory-structure)
-7. [Contributing](#contributing)
+1. [Project Overview](#project-overview)
+2. [System Highlights](#system-highlights)
+3. [End-to-End Workflow](#end-to-end-workflow)
+4. [Architecture Snapshot](#architecture-snapshot)
+5. [Requirements & Setup](#requirements--setup)
+6. [Known Limitations & Roadmap](#known-limitations--roadmap)
+7. [Contributing & Support](#contributing--support)
+8. [Documentation Links](#documentation-links)
 
 ---
 
-## Overview
+## Project Overview
 
-This project is part of the Canadian Coastal Change project at NRCan, where we seek to gather a nationwide dataset explaining shoreline evolution around Canada’s coast over the past 40+ years. This CLI tool enables standardized analysis of AOIs using shoreline transects that track positional change. Landsat satellite imagery and tide correction via the FES2022 model are used to build consistent, validated shoreline time series.
+Canada’s coastline stretches over 200,000 km and exhibits large spatial variability in geomorphology, forcing, and available observations. The Canadian Coastal Change program aims to build a consistent 40+ year history of shoreline change for priority Areas of Interest (AOIs). Manually running CoastSat per AOI is slow, hard to reproduce, and error prone. CoastSatCLI addresses those issues by:
 
----
+- Guiding analysts through a structured initialization of AOIs, transects, and reference shorelines.
+- Automating the CoastSat processing pipeline (imagery download, shoreline detection, QC artifacts, tide correction, exports).
+- Storing inputs/outputs with clear provenance so that future reruns can compare how decisions changed results.
 
-## Installation & Prerequisites
-
-This CLI relies on several geospatial and scientific Python libraries. **You must install and use a Conda or Mamba environment.**
-
-### Required Tools
-
-* **Miniforge** (recommended): A minimal installer for Conda or Mamba with conda-forge as default.
-* **Conda** or **Mamba**: For environment/package management.
-* **Python**: Version 3.8 or higher (tested on 3.11).
-
-<details>
-<summary>What is Miniforge and how to install it?</summary>
-
-[Miniforge](https://github.com/conda-forge/miniforge) is a lightweight installer that enables you to manage packages through **conda** or **mamba**, with full support for the **conda-forge** channel. This improves compatibility with geospatial and scientific packages.
-
-**Install Miniforge:**
-
-1. Go to [Miniforge GitHub Releases](https://github.com/conda-forge/miniforge#miniforge3).
-2. Download the installer for your operating system.
-3. Follow the installation instructions for your platform.
-
-Once installed, you can use `conda` or `mamba` from the terminal.
-
-</details>
-
-### Required Python Packages
-
-* `geopandas`, `shapely`, `matplotlib`, `scikit-image`, `rasterio`, `gdal`, `pyfes`, `pyyaml`, `typer`, `imageio`, `imageio-ffmpeg`, `tkinter`
-
-### Installation Steps
-
-1. **Clone this repository** and change into its folder:
-
-   ```bash
-   git clone https://github.com/BenJTowers/CoastSatCLI
-   cd coastsat-cli
-   ```
-
-2. **Create and activate a Conda environment**:
-
-   ```bash
-   conda create -n coastsat python=3.11
-   conda activate coastsat
-   conda install geopandas gdal rasterio
-   conda install earthengine-api scikit-image matplotlib astropy notebook
-   pip install pyqt5 imageio-ffmpeg
-   conda install pyfes pyyaml typer
-   ```
-
-   Or, using Mamba:
-
-   ```bash
-   mamba create -n coastsat python=3.11
-   mamba activate coastsat
-   mamba install geopandas gdal rasterio earthengine-api scikit-image matplotlib astropy notebook pyfes pyyaml typer
-   pip install pyqt5 imageio-ffmpeg
-   ```
-
-> ⚠️ If you encounter installation issues, try:
->
-> ```bash
-> conda clean --all
-> conda update conda
-> ```
+The README introduces the project from first principles; long-form technical documentation now lives under `docs/`.
 
 ---
 
-## 🌍 Step 2: Set Up Google Earth Engine
+## System Highlights
 
-This project uses the **Google Earth Engine (GEE)** API to download satellite imagery (e.g., Landsat, Sentinel-2). To enable this:
+- **CLI front-end for CoastSat**: Typer-powered commands (`init`, `run`, `site-rerun`, `show`) encode best practices for Canadian AOIs. A lightweight GUI is planned once the CLI feature set stabilizes.
+- **Automated tide-aware pipeline**: The default workflow wires CoastSat outputs into FES2022 tide corrections and percentiles-based filtering so you can go straight from raw imagery to slope CSVs and plots.
+- **Speed & reproducibility improvements**:
+  - Headless execution batches CoastSat steps without manual notebook intervention.
+  - Shared utilities in `CLI/` (file helpers, geo transforms, dialog prompts) ensure analysts follow the same data layout.
+  - Rerun tooling lets you surgically update transects or reference shorelines while keeping other assets intact.
+- **Extendable architecture**: Classifier training notebooks and scripts live in `classification/`, while tidal/no-tide variants of the analysis are maintained side by side. ADRs capture the bigger design decisions.
 
-### 2.1 Sign Up for Earth Engine
+---
 
-👉 [https://signup.earthengine.google.com](https://signup.earthengine.google.com)
+## End-to-End Workflow
 
-Use your **Google account** to request access.
+### 1. Initialize a Site (`python cli/coastsatcli.py init`)
+- Launches an interactive prompt (or dialog on Windows) to collect sitename, AOI polygons, shoreline inputs, reference data, transect options, and optional tide filters.
+- Produces a canonical project tree:
+  ```
+  <base>/<sitename>/
+  ├─ inputs/
+  │  ├─ shoreline/
+  │  ├─ aoi/
+  │  ├─ reference/
+  │  └─ transects/
+  ├─ outputs/
+  └─ settings.json
+  ```
+- Writes `settings.json` with resolved paths, EPSG choices, and tide configuration so subsequent commands can run unattended.
 
-### 2.2 Install the Google Cloud SDK
+### 2. Run the Complete Analysis (`python cli/coastsatcli.py run --config ...`)
+- Invokes `Complete_Analysis.py` (tide-aware) or `Complete_Analysis_No_Tide.py` based on the settings file.
+- Steps include imagery retrieval through the CoastSat Google Earth Engine (GEE) stack, shoreline classification, QC plots, slope estimation, CSV export, and optional media outputs.
+- Tide corrections use `pyfes` plus site-specific percentile filters when configured.
 
-Download: [https://cloud.google.com/sdk/docs/install](https://cloud.google.com/sdk/docs/install)
+### 3. Inspect Outputs & Iterate
+- Use `python cli/coastsatcli.py show --config ...` to summarize the output tree (plots, GeoJSON, CSVs).
+- Analysts typically review:
+  - Shoreline overlay plots and transect-by-transect time series.
+  - CSV statistics for slope changes, tide adjustments, and filter counts.
+  - Debug GeoJSON files for manual QA/QC.
 
-After installation, run:
+### 4. Rerun with Updated Inputs (`python cli/coastsatcli.py site-rerun`)
+- Designed for cases where transect placement, AOIs, or reference shorelines evolve.
+- Optionally clears previous outputs while keeping imagery caches, so reruns focus on the changed components.
+- Ensures the provenance of new outputs is tied to the updated configuration.
+
+> **Future workflows**: A simple desktop UI will sit on top of the same commands, and we plan to document additional automation (batch runs, scheduler integration) inside `docs/ops/`.
+
+---
+
+## Architecture Snapshot
+
+| Layer | Purpose | Key Assets |
+| --- | --- | --- |
+| CLI Interface | Collects user input, validates configuration, dispatches jobs. | `cli/coastsatcli.py`, `CLI/dialogs.py`, `CLI/file_utils.py`, `CLI/geo_utils.py` |
+| Analysis Engines | Execute CoastSat shoreline extraction with and without tide correction. | `Complete_Analysis.py`, `Complete_Analysis_No_Tide.py`, scripts in `coastsat/` |
+| Classification & Training | Train/refresh classifiers for shoreline detection. | `classification/train_new_classifier.ipynb` |
+| Documentation & Decisions | Provide context for architecture, operations, and contributions. | `docs/` tree with ADRs, architecture notes, ops runbooks, user/dev guides |
+
+Additional diagrams and component deep dives will be maintained in `docs/architecture/` as they mature.
+
+---
+
+## Requirements & Setup
+
+This project targets Miniforge/Mamba environments on Windows (primary), Linux, and macOS. Python 3.11 is the current tested version. An `environment.yml` will be published once dependency locking stabilizes; for now follow the steps below.
+
+### 1. Install & Configure the Conda/Mamba Environment
+
+Use Miniforge so the `conda-forge` channel is the default:
+
+1. Download Miniforge for your platform: <https://github.com/conda-forge/miniforge#miniforge3>
+2. Install it and open a Miniforge (or terminal) prompt.
+3. Create and activate the CoastSat environment using the provided spec (recommended):
 
 ```bash
-gcloud auth application-default login
-```
-
-> ⚠️ This ensures your Earth Engine credentials persist across runs.
-
-✅ Once authenticated, you're ready to initialize a CoastSat project.
-
----
-## 🌍 Step 3: FES2022 Tide Model setup
-
-This project uses the **FES2022 global tide model** to correct shoreline positions based on modeled tides at your AOI location. You’ll need to install the `pyfes` package and configure the model by downloading the required data and linking it in a `fes2022.yaml` file.
-
-### 3.1: Install `pyfes`
-
-If you're using a clean CoastSat environment as described above, `pyfes` should already be installed.
-
-If not, run:
-
-```bash
-conda install -c conda-forge pyfes
-```
-
-If you encounter conflicts (common with older environments), create a new Conda environment using the steps in the main installation section.
-
----
-
-### 3.2: Download FES2022 NetCDF Files
-
-To use the tide model, download the required ocean and load tide components (NetCDF files).
-
-#### Option A: Direct Download (Recommended)
-
-Use this SFTP link in a client like **WinSCP**, **Cyberduck**, or another SFTP tool:
-
-```
-sftp://ftp-access.aviso.altimetry.fr:2221/auxiliary/tide_model/fes2022b
-```
-
-**Download the following folders:**
-
-* `/ocean_tide`
-* `/load_tide`
-
-You should end up with \~34 `.nc` files total across both folders. Do **not** use the `/ocean_tide_extrapolate` folder.
-
-#### Option B: Manual Access via AVISO Website
-
-1. Go to: [https://www.aviso.altimetry.fr](https://www.aviso.altimetry.fr)
-2. Create a user account and log in.
-3. Fill out the [FES model data access form](https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html) (check **FES - Oceanic Tide Heights**).
-4. After approval, access your downloads via [My Products](https://www.aviso.altimetry.fr/en/my-aviso-plus/my-products.html).
-5. Use the SFTP link above to download the data.
-
----
-
-### 3.3: Download and Configure `fes2022.yaml`
-
-Download the config file:
-
-👉 [fes2022.yaml from GitHub](https://github.com/CNES/aviso-fes/tree/main/data/fes2022b)
-
-Place it in the same directory as your downloaded `/ocean_tide` and `/load_tide` folders.
-
-Then, open `fes2022.yaml` in a text editor and **update the paths** to point to the exact locations of the NetCDF files on your system. Example (Windows-style):
-
-```yaml
-cartesian:
-  amplitude: amplitude
-  latitude: lat
-  longitude: lon
-  paths:
-    2N2: C:\Users\ben\Documents\fes2022b\load_tide\2n2_fes2022.nc
-    K1:  C:\Users\ben\Documents\fes2022b\load_tide\k1_fes2022.nc
-    M2:  C:\Users\ben\Documents\fes2022b\ocean_tide\m2_fes2022.nc
-```
-
-Make sure both `radial` and `cartesian` sections are fully updated. Use find-and-replace to quickly update the root path if needed.
-
----
-
-### 3.4: Test the Setup (Optional)
-
-To verify that the tide model is correctly configured:
-
-```bash
+conda env create -f environment.yml
 conda activate coastsat
-python
 ```
 
-Then in Python:
+If Conda is slow on your machine and you have `mamba` installed, you can substitute `mamba env create` / `mamba activate`.
 
-```python
-import pyfes
-handlers = pyfes.load_config("C:/path/to/fes2022.yaml")
-```
-
-If no error is returned after a few minutes, your setup is complete.
-
-😃 Your CoastSat project can now model tides globally using FES2022.
-
-
-## Quick Start
-
-Below is a minimal workflow. After installation, you will:
-
-1. Initialize a new project folder (GUI dialogs).
-2. Run the CoastSat analysis pipeline.
-3. Inspect results under the output directory.
-
-### 3.1 Initialize a Project
+If you prefer manual installation, follow the steps below:
 
 ```bash
-python cli/coastsatcli.py init
+conda create -n coastsat
+conda activate coastsat
+conda install python=3.11 geopandas gdal -y
+conda install earthengine-api scikit-image matplotlib astropy notebook -y
+pip install pyqt5 imageio-ffmpeg
+conda install pyfes -y
+conda install pyyaml -y
 ```
 
-You will be prompted to:
-
-* Select a **base directory** (system file‐browser dialog).
-* Enter a **project name** (e.g., `tuk`).
-* Select a **shoreline shapefile**.
-* Confirm or override the **EPSG code** (auto‐detected).
-* Select one or more **AOI files** (GeoJSON, KML, or SHP).
-* For each AOI, CoastSat will:
-
-  * Clip the shoreline.
-  * Generate a reference shoreline.
-  * Generate transects.
-  * Save all files in a new project folder.
-
-At the end, you will be asked whether to **immediately run the analysis**. You may choose "Yes" to begin processing right away, or "No" to run it later using the CLI.
-
-Structure:
-
-```
-<base_dir>/<sitename>/
-├── inputs/
-│   ├── shoreline/...
-│   ├── aoi/...
-│   ├── reference/...
-│   └── transects/...
-├── settings.json
-└── outputs/
-```
-
-### 3.2 Run the Complete Analysis
+Your prompt should now start with `(coastsat)`. If you hit dependency issues, clean up and retry:
 
 ```bash
-python cli/coastsatcli.py run --config path/to/<sitename>/settings.json
+conda clean --all
+conda update conda
 ```
 
-This runs:
+> Prefer `conda` for compatibility. If you already use `mamba`, it can replace any of the commands above for faster solves. Keep the environment activated (`conda activate coastsat`) before running CLI commands.
 
-```bash
-python Complete_Analysis.py --config path/to/settings.json
-```
+### 2. Activate the Google Earth Engine (GEE) API
 
-Which downloads imagery, extracts shorelines, applies FES2022 tide correction, generates slope plots, and more.
-
-### 3.3 Rerun an Existing Project with Updated Inputs
-
-If your initial CoastSat results were unsatisfactory (e.g., due to poor transect placement or outdated shoreline data), the `site-rerun` command allows you to reprocess a site without creating a new project from scratch.
-
-This command lets you:
-- Replace the **reference shoreline** file
-- Replace or regenerate the **transects** (with optional updated settings)
-- **Clear previous outputs** to remap shorelines from scratch
-- Launch the full analysis again using the updated inputs
-
-#### ✅ Example usage:
-```bash
-python cli/coastsatcli.py site-rerun
-```
-
-You’ll be prompted to:
-1. Select an existing `settings.json` file
-2. Choose whether to replace or regenerate shoreline/transect files
-3. (Optionally) clear existing outputs
-4. Rerun the analysis using the updated inputs
-
-**Note:** The original `settings.json` is not modified beyond resolving input paths. Only the input files are updated or regenerated as needed.
-
----
-
-## CLI Commands
-
-```
-Usage: python cli/coastsatcli.py [OPTIONS] COMMAND [ARGS]...
-
-Options:
-  --help  Show this message and exit.
-
-Commands:
-  init  Create a new CoastSat project (shoreline, AOIs, transects).
-  run   Run the full CoastSat analysis using your settings.json.
-  show  Show the directory tree under the project’s output folder.
-```
-
----
-
-## Settings File (settings.json)
-
-```json
-{
-  "inputs": {
-    "sitename": "tuk",
-    "shoreline_path": "inputs/shoreline/CANCOAST.geojson",
-    "aoi_paths": ["inputs/aoi/tuk_aoi.geojson"],
-    "reference_shoreline": "inputs/reference/tuk_ref.geojson",
-    "transects": "inputs/transects/tuk_transects.geojson"
-  },
-  "output_dir": "outputs",
-  "output_epsg": 3156,
-  "fes_config": "/absolute/path/to/fes2022.yaml"
-}
-```
-
----
-
-## Directory Structure
-
-```
-<base_dir>/<sitename>/
-├─ inputs/
-│   ├─ shoreline/
-│   ├─ aoi/
-│   ├─ reference/
-│   └─ transects/
-├─ outputs/
-│   ├─ plots/
-│   └─ time_series/
-└─ settings.json
-```
-
----
-
-## Contributing
-
-1. Fork this repository and create a branch:
-
+1. Request access: <https://signup.earthengine.google.com/>
+2. Install the Google Cloud SDK: <https://cloud.google.com/sdk/docs/install>
+3. Initialize and authenticate:
    ```bash
-   git checkout -b feature/your-feature
+   gcloud init
+   gcloud auth application-default login
    ```
-2. Commit your changes:
-
-   ```bash
-   git commit -m "Add new feature"
+4. Record your GEE project name (`gcloud config get-value project`) and configure the CoastSat scripts, e.g.:
+   ```python
+   project_name = "ee-yourproject"
+   SDS_download.authenticate_and_initialize(project_name)
    ```
-3. Push to your fork:
 
-   ```bash
-   git push origin feature/your-feature
-   ```
-4. Open a Pull Request with a description of your changes.
+If authentication keeps expiring, rerun `gcloud auth application-default login` or `gcloud components update`.
 
-Please follow the existing style:
+### 3. Clone and Run
 
-* Use `typer` for all CLI interactions.
-* Keep each function focused and concise.
-* Write clear docstrings for any new helper functions.
-* Add tests or manual-validation instructions for new features.
+```bash
+git clone https://github.com/BenJTowers/CoastSatCLI
+cd CoastsatCLI
+conda activate coastsat
+python cli/coastsatcli.py --help
+```
+
+---
+
+## Known Limitations & Roadmap
+
+- **Outlier detection**: Extreme shoreline positions occasionally slip through current QC thresholds. Work is underway to incorporate more robust statistical filters and manual review tooling.
+- **Slope calculation**: The slope estimation used for tide correction is sensitive to sparse observations on some transects. We are evaluating improved interpolation methods and confidence scoring.
+- **User interface**: A desktop UI is planned to lower the barrier for new analysts. Until then, the CLI remains the supported entry point.
+
+Follow upcoming ADRs and issue discussions in `docs/adrs/` for decisions on these topics.
+
+---
+
+## Contributing & Support
+
+We welcome contributions from the Canadian Coastal Change team and collaborators:
+
+1. Fork and branch from `main`.
+2. Keep changes focused; include tests or manual validation notes for CLI flows.
+3. Submit a pull request describing the motivation, testing, and any documentation updates.
+
+Open issues or discussions on GitHub for bugs, enhancement ideas, or documentation requests. Internal program members can also reach the maintainers via the usual NRCan channels.
+
+For coding standards, testing expectations, and release guidance see the draft documents in `docs/dev/`.
+
+---
+
+## Documentation Links
+
+Long-form documentation now lives in `docs/`:
+
+- [`docs/README.md`](docs/README.md) — high-level documentation plan and folder map.
+- [`docs/adrs/`](docs/adrs) — Architecture Decision Records (start with `ADR-000-template.md`).
+- [`docs/architecture/`](docs/architecture) — system context, component catalogs, data flow notes.
+- [`docs/ops/`](docs/ops) — operational runbooks and environment/deployment references.
+- [`docs/user/`](docs/user) — CLI walkthroughs, configuration references, troubleshooting, glossary.
+- [`docs/dev/`](docs/dev) — contribution guide, testing strategy, release/versioning plans.
+
+The README will stay focused on onboarding and cross-link to richer documents as they evolve.
 
 ---
