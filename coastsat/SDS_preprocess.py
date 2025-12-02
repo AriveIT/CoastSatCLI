@@ -662,7 +662,7 @@ def create_jpg(im_ms, cloud_mask, date, satname, filepath, use_matplotlib=True):
         fig.savefig(os.path.join(filepath, date + '_' + satname + '.jpg'), dpi=150)
         plt.close(fig)
 
-def save_jpg(metadata, settings, use_matplotlib=False):
+def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None):
     """
     Saves a .jpg image for all the images contained in metadata.
 
@@ -716,12 +716,14 @@ def save_jpg(metadata, settings, use_matplotlib=False):
             fn = SDS_tools.get_filenames(filenames[i],filepath, satname)
             # read and preprocess image
             im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = preprocess_single(fn, satname, settings['cloud_mask_issue'],
-                                                                                      settings['pan_off'], s2cloudless_prob)
+                                                                                     settings['pan_off'], s2cloudless_prob)
+            date = filenames[i][:19]
 
             # compute cloud_cover percentage (with no data pixels)
             cloud_cover_combined = np.divide(sum(sum(cloud_mask.astype(int))),
                                     (cloud_mask.shape[0]*cloud_mask.shape[1]))
             if cloud_cover_combined > 0.99: # if 99% of cloudy pixels in image skip
+                _save_debug_jpg(debug_skipped_dir, im_ms, cloud_mask, date, satname, use_matplotlib)
                 continue
 
             # remove no data pixels from the cloud mask (for example L7 bands of no data should not be accounted for)
@@ -731,15 +733,24 @@ def save_jpg(metadata, settings, use_matplotlib=False):
                                     (sum(sum((~im_nodata).astype(int)))))
             # skip image if cloud cover is above threshold
             if cloud_cover > cloud_thresh or cloud_cover == 1:
+                _save_debug_jpg(debug_skipped_dir, im_ms, cloud_mask, date, satname, use_matplotlib)
                 continue
             # save .jpg with date and satellite in the title
-            date = filenames[i][:19]
             plt.ioff()  # turning interactive plotting off
             create_jpg(im_ms, cloud_mask, date, satname, filepath_jpg, use_matplotlib)
         print('')
     # print the location where the images have been saved
     print('Satellite images saved as .jpg in ' + os.path.join(filepath_data,
                                                     'jpg_files', 'preprocessed'))
+
+def _save_debug_jpg(debug_dir, im_ms, cloud_mask, date, satname, use_matplotlib):
+    if debug_dir is None:
+        return
+    os.makedirs(debug_dir, exist_ok=True)
+    try:
+        create_jpg(im_ms, cloud_mask, date, satname, debug_dir, use_matplotlib)
+    except Exception:
+        pass
 
 def get_reference_sl(metadata, settings):
     """

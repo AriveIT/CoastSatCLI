@@ -4,6 +4,13 @@ import typer
 from pathlib import Path
 import subprocess
 import json
+import sys
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from coastsat_pipeline.cli import run_pipeline_from_config
 
 def choose_file(
     title: str = "Select a file",
@@ -167,7 +174,7 @@ def get_transect_settings_from_user() -> dict:
         "transect_skip_threshold": skip_threshold
     }
 
-def prompt_and_run_analysis(settings_paths: list[str]):
+def prompt_and_run_analysis(settings_paths: list[str], engine: str = "legacy"):
     """
     Prompts user to run analysis on the provided list of settings.json paths.
     Handles both single and batch site cases.
@@ -189,13 +196,13 @@ def prompt_and_run_analysis(settings_paths: list[str]):
     for settings_path in settings_paths:
         sitename = Path(settings_path).parent.name
         typer.echo(f"\n→ Running analysis for {sitename}...")
-        exit_code = run_analysis_from_config(Path(settings_path))
+        exit_code = run_analysis_from_config(Path(settings_path), engine=engine)
         if exit_code == 0:
             typer.secho(f"  ✓ {sitename} completed successfully!", fg=typer.colors.GREEN)
         else:
             typer.secho(f"  ❌ {sitename} failed with exit code {exit_code}.", fg=typer.colors.RED)
 
-def run_analysis_from_config(config_path: Path) -> int:
+def run_analysis_from_config(config_path: Path, engine: str = "legacy") -> int:
     """
     Runs the appropriate analysis script based on the settings.json tide config.
 
@@ -206,9 +213,18 @@ def run_analysis_from_config(config_path: Path) -> int:
         int: Exit code from the subprocess (0 for success).
     """
     config_path = config_path.expanduser().resolve()
+    engine = engine.lower()
     if not config_path.exists():
         typer.secho(f"ERROR: Cannot find config at {config_path}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
+
+    if engine == "pipeline":
+        try:
+            run_pipeline_from_config(config_path)
+            return 0
+        except Exception as exc:
+            typer.secho(f"Pipeline run failed: {exc}", fg=typer.colors.RED)
+            return 1
 
     with open(config_path) as f:
         config = json.load(f)

@@ -1,0 +1,212 @@
+from __future__ import annotations
+
+import gc
+import os
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, Tuple
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import pytz
+import pyfes
+from shapely.geometry import Polygon
+
+from coastsat import SDS_slope, SDS_tools, SDS_transects
+
+
+@dataclass
+class SlopeOptions:
+    save_figures: bool = True
+    cache_dir_name: str = "slope_estimation"
+
+
+def run_slope_estimation(
+    settings: Dict[str, Any],
+    cross_distance: Dict[str, Any],
+    output: Dict[str, Any],
+    options: SlopeOptions | None = None,
+) -> Tuple[Dict[str, float], list[Any], np.ndarray]:
+    options = options or SlopeOptions()
+    fp_slopes = os.path.join(settings["inputs"]["filepath"], options.cache_dir_name)
+    os.makedirs(fp_slopes, exist_ok=True)
+
+    filtered_output = _filter_output(output)
+    cross_distance = _compute_filtered_cross_distance(filtered_output, settings)
+
+    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, filtered_output)
+
+    (
+        filtered_dates_sat,
+        filtered_tides_sat,
+        filtered_cross_distance,
+        tide_stats,
+    ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance)
+
+    slope_est, cis = _estimate_slopes(
+        fp_slopes,
+        filtered_dates_sat,
+        filtered_tides_sat,
+        filtered_cross_distance,
+        options.save_figures,
+    )
+
+    settings["tide_filter_stats"] = {**settings.get("tide_filter_stats", {}), **tide_stats}
+    return slope_est, dates_sat, tides_sat
+
+
+def _filter_output(output: Dict[str, Any]) -> Dict[str, Any]:
+    filtered = dict(output)
+    if "satname" in filtered and "S2" in filtered["satname"]:
+        idx_keep = np.array([sat != "S2" for sat in filtered["satname"]])
+        for key in filtered.keys():
+            filtered[key] = [filtered[key][i] for i in np.where(idx_keep)[0]]
+    filtered = SDS_tools.remove_duplicates(filtered)
+    filtered = SDS_tools.remove_inaccurate_georef(filtered, 12)
+    return filtered
+
+
+def _compute_filtered_cross_distance(output: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
+    transects = SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"])
+    settings_transects = {
+        "along_dist": 50,
+        "min_points": 3,
+        "max_std": 15,
+        "max_range": 30,
+        "min_chainage": -100,
+        "multiple_inter": "max",
+        "auto_prc": 0.1,
+    }
+    cross_distance = SDS_transects.compute_intersection_QC(output, transects, settings_transects)
+    settings_outliers = {
+        "max_cross_change": 40,
+        "otsu_threshold": [-0.5, 0],
+        "plot_fig": False,
+    }
+    return SDS_transects.reject_outliers(cross_distance, output, settings_outliers)
+
+
+def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any]):
+    handlers = pyfes.load_config(settings["inputs"]["fes_config"])
+    ocean_tide = handlers["tide"]
+    load_tide = handlers["radial"]
+
+    aoi_geom = Polygon(settings["inputs"]["polygon"][0])
+    centroid = SDS_tools.select_valid_centroid(aoi_geom, ocean_tide, load_tide)
+
+    date_range = [
+        pytz.utc.localize(datetime(1984, 1, 1)),
+        pytz.utc.localize(datetime(2025, 1, 1)),
+    ]
+    timestep = 900
+    dates_ts, tides_ts = SDS_slope.compute_tide(centroid, date_range, timestep, ocean_tide, load_tide)
+
+    dates_sat = output["dates"]
+    tides_sat = np.asarray(
+        SDS_slope.compute_tide_dates(centroid, dates_sat, ocean_tide, load_tide),
+        dtype=float,
+    )
+
+    del ocean_tide, load_tide
+    gc.collect()
+
+    return centroid, dates_ts, tides_ts, dates_sat, tides_sat
+
+
+def _apply_tide_filters(
+    settings: Dict[str, Any],
+    dates_ts,
+    tides_ts,
+    dates_sat,
+    tides_sat,
+    cross_distance,
+):
+    settings_slope = settings.setdefault("slope_settings", {})
+    settings_slope["n_days"] = 8
+
+    tide_filter_cfg = settings.get("tide_filter")
+    tide_filter_mask = np.ones_like(tides_sat, dtype=bool)
+    tide_thresholds = {}
+    if tide_filter_cfg:
+        source_series = np.asarray(tides_ts, dtype=float)
+        lower_pct = tide_filter_cfg.get("lower_percentile")
+        upper_pct = tide_filter_cfg.get("upper_percentile")
+
+        if lower_pct is not None:
+            lower_thresh = float(np.nanpercentile(source_series, lower_pct))
+            tide_thresholds["lower_threshold"] = lower_thresh
+            tide_filter_mask &= tides_sat >= lower_thresh
+        if upper_pct is not None:
+            upper_thresh = float(np.nanpercentile(source_series, upper_pct))
+            tide_thresholds["upper_threshold"] = upper_thresh
+            tide_filter_mask &= tides_sat <= upper_thresh
+
+        removed = int(np.count_nonzero(~tide_filter_mask))
+        total = int(tides_sat.size)
+        tide_thresholds["removed_acquisitions"] = removed
+        tide_thresholds["total_acquisitions"] = total
+
+    date_start = pytz.utc.localize(datetime(1984, 1, 1))
+    date_end = pytz.utc.localize(datetime(2025, 1, 1))
+    normalized_dates: list[datetime] = [
+        _ensure_aware(raw_date) for raw_date in dates_sat
+    ]
+    idx_dates = np.array(
+        [date_start < aware < date_end for aware in normalized_dates],
+        dtype=bool,
+    )
+    combined_mask = idx_dates & tide_filter_mask if tide_filter_cfg else idx_dates
+    selected_indices = np.where(combined_mask)[0]
+    if selected_indices.size == 0:
+        selected_indices = np.where(idx_dates)[0] if np.any(idx_dates) else np.arange(len(dates_sat))
+    print("4")
+    settings.setdefault("tide_filter_stats", {})["used_for_slopes"] = int(selected_indices.size)
+    filtered_dates_sat = [dates_sat[i] for i in selected_indices]
+    filtered_tides_sat = tides_sat[selected_indices]
+    filtered_cross_distance = {
+        key: cross_distance[key][selected_indices] for key in cross_distance.keys()
+    }
+
+    return filtered_dates_sat, filtered_tides_sat, filtered_cross_distance, tide_thresholds
+
+
+def _ensure_aware(date):
+    if not isinstance(date, datetime):
+        date = pd.to_datetime(date).to_pydatetime()
+
+    if date.tzinfo is None or date.tzinfo.utcoffset(date) is None:
+        return pytz.utc.localize(date)
+    return date.astimezone(pytz.utc)
+
+
+def _estimate_slopes(
+    fp_slopes: str,
+    filtered_dates_sat,
+    filtered_tides_sat,
+    filtered_cross_distance,
+    save_figures: bool,
+):
+    settings_slope = {"plot_fig": save_figures}
+    slope_est, cis = {}, {}
+    for key in filtered_cross_distance.keys():
+        try:
+            idx_nan = np.isnan(filtered_cross_distance[key])
+            dates = [filtered_dates_sat[i] for i in range(len(filtered_dates_sat)) if not idx_nan[i]]
+            tide = np.array(filtered_tides_sat)[~idx_nan]
+            composite = np.array(filtered_cross_distance[key])[~idx_nan]
+
+            tsall = SDS_slope.tide_correct(composite, tide, 0.1)
+            if len(dates) == 0 or len(tsall) == 0:
+                slope_est[key], cis[key] = 0.1, (0.1, 0.1)
+                continue
+            slope_est[key], cis[key] = SDS_slope.integrate_power_spectrum(dates, tsall, settings_slope, key)
+            if save_figures:
+                plt.gcf().savefig(os.path.join(fp_slopes, f"2_energy_curve_{key}.jpg"), dpi=200)
+                plt.close()
+                SDS_slope.plot_spectrum_all(dates, composite, tsall, settings_slope, slope_est[key])
+                plt.gcf().savefig(os.path.join(fp_slopes, f"3_slope_spectrum_{key}.jpg"), dpi=200)
+                plt.close()
+        except Exception:
+            slope_est[key], cis[key] = 0.1, (0.1, 0.1)
+    return slope_est, cis

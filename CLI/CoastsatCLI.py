@@ -1,9 +1,15 @@
 import os
+import sys
 import typer
 import time
 import json
 import geopandas as gpd
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from dialogs import choose_file, choose_folder, choose_file_multiple, get_transect_settings_from_user, prompt_and_run_analysis, run_analysis_from_config, get_tide_correction_settings
 from file_utils import setup_project_directories, clear_output_directory
 from geo_utils import detect_or_prompt_epsg, load_aoi_and_shoreline, create_and_save_reference_shoreline, generate_and_save_transects, regenerate_transects_from_config
@@ -143,7 +149,15 @@ def initialize_single_site(
     "init",
     help="Create a new CoastSat project (AOI, shoreline, transects, FES + output structure)."
 )
-def init():
+def init(
+    engine: str = typer.Option(
+        "legacy",
+        "--engine",
+        "-e",
+        case_sensitive=False,
+        help="Choose 'legacy' to run the existing scripts or 'pipeline' to test the new runner when prompted to run.",
+    )
+):
     """
     Step‐by‐step project initialization:
       1) Pick a base directory.
@@ -224,7 +238,7 @@ def init():
             typer.echo(f"  • {sitename:<12} → {output_dir}")
 
         # 7) Run analysis immediately
-        prompt_and_run_analysis(settings_paths)
+        prompt_and_run_analysis(settings_paths, engine=engine.lower())
 
     else:
         # 6) Prompt for single AOI KML file
@@ -248,11 +262,19 @@ def init():
         typer.secho("\n✅ Project initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
 
         # 7) Run analysis immediately
-        prompt_and_run_analysis([site_info['settings_path']])
+        prompt_and_run_analysis([site_info['settings_path']], engine=engine.lower())
 
 @app.command("site-rerun", help="Rerun a previously initialized CoastSat site with updated inputs.")
 
-def site_rerun():
+def site_rerun(
+    engine: str = typer.Option(
+        "legacy",
+        "--engine",
+        "-e",
+        case_sensitive=False,
+        help="Choose 'legacy' to run the existing scripts or 'pipeline' to test the new runner.",
+    )
+):
     """
     Allows rerunning an existing CoastSat site with the option to override shoreline,
     transects, or transect settings. This is useful for refining results after an
@@ -318,17 +340,24 @@ def site_rerun():
         )
 
     # Step 6: Prompt to run analysis
-    prompt_and_run_analysis([settings_path])
+    prompt_and_run_analysis([settings_path], engine=engine.lower())
 
 @app.command("run", help="Run the full CoastSat analysis using your settings.json.")
 def run(
-    config: str = typer.Option(..., "--config", "-c", help="Path to project settings.json")
+    config: str = typer.Option(..., "--config", "-c", help="Path to project settings.json"),
+    engine: str = typer.Option(
+        "legacy",
+        "--engine",
+        "-e",
+        case_sensitive=False,
+        help="Choose 'legacy' to run the existing scripts or 'pipeline' to test the new runner.",
+    ),
 ):
     """
-    Invoke Complete_Analysis.py with the provided settings.json.
+    Invoke the analysis engine with the provided settings.json.
     """
 
-    exit_code = run_analysis_from_config(Path(config))
+    exit_code = run_analysis_from_config(Path(config), engine=engine.lower())
     if exit_code == 0:
         typer.secho("\n✅ Analysis completed successfully!", fg=typer.colors.GREEN)
     else:

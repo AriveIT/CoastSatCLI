@@ -113,6 +113,24 @@ Before accepting a site’s results:
 
 If anything looks off, re-run `site-rerun` to adjust inputs or tweak tide/transect parameters, then repeat the QA steps.
 
+--- 
+## 6. Standalone Tide Series Export
+
+Need only the tide model output without running the full shoreline workflow? Use the helper script:
+
+```bash
+python cli/run_tide_model.py --config path/to/<sitename>/settings.json --output tides.csv
+```
+
+Key options:
+- `--start/--end`: ISO timestamps in UTC (defaults `2013-01-01T00:00:00Z` to `2025-12-31T00:00:00Z`).
+- `--step-minutes`: sample spacing (default 15 minutes).
+- `--lon/--lat`: override or provide the centroid directly.
+- `--aoi-path`: AOI polygon (KML/GeoJSON) so the script can determine a centroid without a config file.
+- `--fes-config`: path to `fes2022.yaml` if your settings file does not include it (required when `--config` is omitted).
+
+The script loads the FES2022 handlers, determines a valid centroid (using the AOI if available), runs `coastsat.SDS_slope.compute_tide`, and saves `timestamp_utc,tide_m` pairs to the requested CSV.
+
 ---
 
 For troubleshooting tips and deep dives into configuration fields, refer to:

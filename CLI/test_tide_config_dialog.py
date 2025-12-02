@@ -1,43 +1,55 @@
-import typer
+from importlib import util
 from pathlib import Path
-from dialogs import choose_file
 
-app = typer.Typer()
+import pytest
 
-def get_tide_correction_settings() -> dict:
-    """
-    Ask the user which tide correction method to use (CSV or FES),
-    and gather all required inputs for that method using GUI dialogs.
-    """
-    typer.echo("→ How would you like to apply tidal correction?")
-    typer.echo("   • csv : Use a tide level CSV file (e.g., from tide gauge or external source)")
-    typer.echo("   • fes : Use the built-in FES2022 tide model (requires YAML config)")
+_DIALOGS_SPEC = util.spec_from_file_location(
+    "cli_dialogs",
+    Path(__file__).resolve().parents[1] / "CLI" / "dialogs.py",
+)
+dialogs = util.module_from_spec(_DIALOGS_SPEC)
+assert _DIALOGS_SPEC and _DIALOGS_SPEC.loader
+_DIALOGS_SPEC.loader.exec_module(dialogs)
 
-    method = typer.prompt("  Enter your choice [csv/fes]", default="fes").strip().lower()
-    settings = {"method": method}
 
-    if method == "csv":
-        typer.echo("\n→ Tide CSV selected.")
-        settings["tide_csv_path"] = choose_file("Select Tide CSV", filetypes=[("CSV files", "*.csv")])
-        settings["reference_elevation"] = float(typer.prompt("Reference elevation (e.g., 0 for MSL)", default="0"))
-        settings["beach_slope"] = float(typer.prompt("Beach slope (e.g., 0.1)", default="0.1"))
-    elif method == "fes":
-        typer.echo("\n→ FES tide model selected.")
-        settings["fes_config"] = choose_file("Select FES2022 YAML config", filetypes=[("YAML files", "*.yaml;*.yml")])
-    else:
-        typer.secho("❌ Invalid method. Choose 'csv' or 'fes'.", fg=typer.colors.RED)
-        raise typer.Exit()
+def _sequence_prompts(monkeypatch, responses):
+    iterator = iter(responses)
 
-    return settings
+    def _prompt(*args, **kwargs):
+        return str(next(iterator))
 
-@app.command()
-def test():
-    typer.echo("\n🔍 Testing tide correction config collection...\n")
-    tide_config = get_tide_correction_settings()
+    monkeypatch.setattr(dialogs.typer, "prompt", _prompt)
 
-    typer.echo("\n✅ Collected Tide Correction Config:\n")
-    for k, v in tide_config.items():
-        typer.echo(f"  {k}: {v}")
 
-if __name__ == "__main__":
-    test()  # <- directly call test()
+def test_get_tide_settings_fes(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        dialogs,
+        "choose_file",
+        lambda *args, **kwargs: str(tmp_path / "fes.yaml"),
+    )
+    monkeypatch.setattr(dialogs, "prompt_tide_filter_settings", lambda: None)
+    _sequence_prompts(monkeypatch, ["fes"])
+
+    result = dialogs.get_tide_correction_settings()
+
+    assert result["method"] == "fes"
+    assert result["fes_config"].endswith("fes.yaml")
+    assert "tide_csv_path" not in result
+
+
+def test_get_tide_settings_csv(monkeypatch, tmp_path):
+    monkeypatch.setattr(
+        dialogs,
+        "choose_file",
+        lambda *args, **kwargs: str(tmp_path / "tides.csv"),
+    )
+    monkeypatch.setattr(dialogs, "prompt_tide_filter_settings", lambda: {"lower_percentile": 10.0, "upper_percentile": 90.0})
+    _sequence_prompts(monkeypatch, ["csv", "0.5", "0.2"])
+
+    result = dialogs.get_tide_correction_settings()
+
+    assert result["method"] == "csv"
+    assert Path(result["tide_csv_path"]).name == "tides.csv"
+    assert result["reference_elevation"] == pytest.approx(0.5)
+    assert result["beach_slope"] == pytest.approx(0.2)
+    assert result["tide_filter"]["lower_percentile"] == 10.0

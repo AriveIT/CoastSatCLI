@@ -217,7 +217,7 @@ def compute_intersection(output, transects, settings):
             d_origin = np.array([np.linalg.norm(sl[k,:] - p1) for k in range(len(sl))])
             # find the shoreline points that are close to the transects and to the origin
             # the distance to the origin is hard-coded here to 1 km 
-            idx_dist = np.logical_and(d_line <= settings['along_dist'], d_origin <= 1000)
+            idx_dist = np.logical_and(d_line <= settings['along_dist'], d_origin <= 200)
             # find the shoreline points that are in the direction of the transect (within 90 degrees)
             temp_sl = sl - np.array(transects[key][0,:])
             phi_sl = np.array([np.arctan2(temp_sl[k,1], temp_sl[k,0]) for k in range(len(temp_sl))])

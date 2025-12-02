@@ -1,0 +1,20 @@
+from __future__ import annotations
+
+from typing import Any, Dict
+
+from ..context import PipelineContext
+from ..helpers.initialization import prepare_initial_settings
+from ..stage import PipelineStage
+
+
+class InitializationStage(PipelineStage):
+    name = "initialization"
+    description = "Prepare CoastSat inputs/settings structures for downstream stages."
+
+    def run(self, context: PipelineContext) -> None:
+        settings = context.require_settings()
+        inputs, analysis_settings, metadata = prepare_initial_settings(settings.raw)
+
+        context.inputs_config = inputs
+        context.analysis_settings = analysis_settings
+        context.metadata["initialization"] = metadata
