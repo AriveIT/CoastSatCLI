@@ -662,7 +662,7 @@ def create_jpg(im_ms, cloud_mask, date, satname, filepath, use_matplotlib=True):
         fig.savefig(os.path.join(filepath, date + '_' + satname + '.jpg'), dpi=150)
         plt.close(fig)
 
-def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None):
+def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None, metrics_callback=None):
     """
     Saves a .jpg image for all the images contained in metadata.
 
@@ -716,13 +716,35 @@ def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None):
             fn = SDS_tools.get_filenames(filenames[i],filepath, satname)
             # read and preprocess image
             im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = preprocess_single(fn, satname, settings['cloud_mask_issue'],
-                                                                                     settings['pan_off'], s2cloudless_prob)
+                                                                                    settings['pan_off'], s2cloudless_prob)
             date = filenames[i][:19]
+            metrics_entry = None
+            if metrics_callback is not None:
+                metrics_entry = {
+                    "satellite": satname,
+                    "scene_id": filenames[i],
+                    "date": date,
+                    "cloud_cover_combined": None,
+                    "cloud_cover": None,
+                    "total_pixels": int(cloud_mask.size),
+                    "valid_pixels": None,
+                    "land_fraction": None,
+                    "water_fraction": None,
+                    "skipped": False,
+                    "skip_reason": None,
+                }
 
             # compute cloud_cover percentage (with no data pixels)
             cloud_cover_combined = np.divide(sum(sum(cloud_mask.astype(int))),
                                     (cloud_mask.shape[0]*cloud_mask.shape[1]))
             if cloud_cover_combined > 0.99: # if 99% of cloudy pixels in image skip
+                if metrics_entry is not None and metrics_callback is not None:
+                    metrics_entry["cloud_cover_combined"] = float(cloud_cover_combined)
+                    metrics_entry["cloud_cover"] = float(cloud_cover_combined)
+                    metrics_entry["valid_pixels"] = int(np.sum(~cloud_mask))
+                    metrics_entry["skipped"] = True
+                    metrics_entry["skip_reason"] = "cloud_cover_combined"
+                    metrics_callback(metrics_entry)
                 _save_debug_jpg(debug_skipped_dir, im_ms, cloud_mask, date, satname, use_matplotlib)
                 continue
 
@@ -731,13 +753,27 @@ def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None):
             # compute updated cloud cover percentage (without no data pixels)
             cloud_cover = np.divide(sum(sum(cloud_mask_adv.astype(int))),
                                     (sum(sum((~im_nodata).astype(int)))))
+            valid_pixels = int(np.sum(~cloud_mask_adv))
+            if metrics_entry is not None:
+                metrics_entry["cloud_cover_combined"] = float(cloud_cover_combined)
+                metrics_entry["cloud_cover"] = float(cloud_cover)
+                metrics_entry["valid_pixels"] = valid_pixels
+                land_frac, water_frac = _compute_mndwi_stats(im_ms, cloud_mask_adv, valid_pixels)
+                metrics_entry["land_fraction"] = land_frac
+                metrics_entry["water_fraction"] = water_frac
             # skip image if cloud cover is above threshold
             if cloud_cover > cloud_thresh or cloud_cover == 1:
+                if metrics_entry is not None and metrics_callback is not None:
+                    metrics_entry["skipped"] = True
+                    metrics_entry["skip_reason"] = "cloud_cover"
+                    metrics_callback(metrics_entry)
                 _save_debug_jpg(debug_skipped_dir, im_ms, cloud_mask, date, satname, use_matplotlib)
                 continue
             # save .jpg with date and satellite in the title
             plt.ioff()  # turning interactive plotting off
             create_jpg(im_ms, cloud_mask, date, satname, filepath_jpg, use_matplotlib)
+            if metrics_entry is not None and metrics_callback is not None:
+                metrics_callback(metrics_entry)
         print('')
     # print the location where the images have been saved
     print('Satellite images saved as .jpg in ' + os.path.join(filepath_data,
@@ -751,6 +787,24 @@ def _save_debug_jpg(debug_dir, im_ms, cloud_mask, date, satname, use_matplotlib)
         create_jpg(im_ms, cloud_mask, date, satname, debug_dir, use_matplotlib)
     except Exception:
         pass
+
+
+def _compute_mndwi_stats(im_ms, cloud_mask_adv, valid_pixels):
+    try:
+        green = im_ms[:, :, 1].astype(float)
+        swir = im_ms[:, :, 4].astype(float)
+    except Exception:
+        return None, None
+    denom = green + swir
+    denom[denom == 0] = 1e-6
+    mndwi = (green - swir) / denom
+    valid_mask = (~cloud_mask_adv) & np.isfinite(mndwi)
+    valid_count = int(np.count_nonzero(valid_mask))
+    if valid_count == 0:
+        return None, None
+    water_pixels = int(np.count_nonzero((mndwi > 0) & valid_mask))
+    land_pixels = int(np.count_nonzero((mndwi <= 0) & valid_mask))
+    return land_pixels / valid_count, water_pixels / valid_count
 
 def get_reference_sl(metadata, settings):
     """
@@ -1110,3 +1164,5 @@ def get_point_from_geojson(sitename, filepath):
 
     return coords
     
+
+

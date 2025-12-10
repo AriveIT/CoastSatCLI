@@ -320,7 +320,7 @@ def compute_intersection_QC(output, transects, settings):
             d_origin = np.linalg.norm(sl - p1, axis=1)
             # find the shoreline points that are close to the transects and to the origin
             # the distance to the origin is hard-coded here to 1 km 
-            idx_dist = np.logical_and(d_line <= along_dist, d_origin <= 1000)
+            idx_dist = np.logical_and(d_line <= along_dist, d_origin <= 200)
             idx_close = np.where(idx_dist)[0]
             
             # in case there are no shoreline points close to the transect 

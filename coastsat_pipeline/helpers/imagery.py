@@ -12,6 +12,10 @@ from pyproj import CRS
 
 from coastsat import SDS_preprocess, SDS_shoreline, SDS_tools
 
+import shutil
+
+from .imagery_quality import maybe_select_ideal_scenes, load_quality_config
+
 
 @dataclass
 class ImageryOptions:
@@ -33,10 +37,25 @@ def run_batch_shoreline_detection(
     """
     options = options or ImageryOptions()
 
-    preprocess_images(metadata, settings)
+    scene_metrics_manifest, scene_metrics_path = _load_scene_metrics(settings)
+
+    preprocess_images(metadata, settings, scene_metrics_manifest, scene_metrics_path)
     cached_output = load_cached_output(settings, cache_enabled=options.cache_enabled)
     if cached_output is not None:
         return cached_output
+
+    # Reload updated metrics and quality config after preprocessing/selection.
+    scene_metrics_manifest, _ = _load_scene_metrics(settings)
+    quality_cfg = load_quality_config(settings["inputs"]["filepath"])
+    preprocessed_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "preprocessed"
+    quality_skip_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "quality_skipped"
+    metadata = _apply_quality_filter(
+        metadata,
+        scene_metrics_manifest,
+        quality_cfg,
+        preprocessed_dir=preprocessed_dir,
+        skip_dir=quality_skip_dir,
+    )
 
     settings["reference_shoreline"] = SDS_preprocess.get_reference_sl_from_geojson(
         settings["inputs"]["reference_geojson"],
@@ -53,7 +72,12 @@ def run_batch_shoreline_detection(
     return output
 
 
-def preprocess_images(metadata: Dict[str, Any], settings: Dict[str, Any]) -> None:
+def preprocess_images(
+    metadata: Dict[str, Any],
+    settings: Dict[str, Any],
+    scene_metrics_manifest: Dict[str, Any] | None = None,
+    scene_metrics_path: Path | None = None,
+) -> None:
     imagery_opts = settings.get("imagery_options", {})
     skip_existing = imagery_opts.get("skip_existing_jpg", True)
     capture_skipped = imagery_opts.get("capture_skipped_jpgs", False)
@@ -61,6 +85,12 @@ def preprocess_images(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Non
     if capture_skipped:
         debug_dir = str(Path(settings["inputs"]["filepath"]) / "jpg_files" / "skipped")
     manifest, manifest_path = _load_jpg_manifest(settings)
+    if scene_metrics_manifest is None or scene_metrics_path is None:
+        scene_metrics, scene_metrics_file = _load_scene_metrics(settings)
+    else:
+        scene_metrics = scene_metrics_manifest
+        scene_metrics_file = scene_metrics_path
+    metrics_buffer: list[Dict[str, Any]] = []
 
     metadata_to_process = metadata
     if skip_existing:
@@ -77,8 +107,17 @@ def preprocess_images(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Non
         settings,
         use_matplotlib=True,
         debug_skipped_dir=debug_dir,
+        metrics_callback=metrics_buffer.append,
     )
     _update_jpg_manifest(manifest, metadata_to_process, manifest_path)
+    _update_scene_metrics(scene_metrics, metrics_buffer, scene_metrics_file)
+    if imagery_opts.get("prompt_for_ideal_selection", False):
+        maybe_select_ideal_scenes(
+            site_dir=settings["inputs"]["filepath"],
+            scene_metrics=scene_metrics,
+            enable_prompt=True,
+            jpg_dir=Path(settings["inputs"]["filepath"]) / "jpg_files" / "preprocessed",
+        )
     print("[Step 4] Generating RGB time-lapse animation (this may take several minutes)...")
 
 
@@ -189,3 +228,129 @@ def _update_jpg_manifest(manifest: Dict[str, set[str]], processed_metadata: Dict
     serializable = {sat: sorted(list(files)) for sat, files in manifest.items()}
     with manifest_path.open("w", encoding="utf-8") as f:
         json.dump(serializable, f, indent=2)
+
+
+def _load_scene_metrics(settings: Dict[str, Any]) -> tuple[Dict[str, Any], Path]:
+    filepath = Path(settings["inputs"]["filepath"]) / "jpg_files" / "scene_metrics.json"
+    try:
+        with filepath.open("r", encoding="utf-8") as f:
+            return json.load(f), filepath
+    except FileNotFoundError:
+        return {}, filepath
+
+
+def _update_scene_metrics(manifest: Dict[str, Any], entries: list[Dict[str, Any]], path: Path) -> None:
+    if not entries:
+        return
+    for entry in entries:
+        scene_id = entry.get("scene_id")
+        if scene_id:
+            manifest[scene_id] = entry
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
+
+def _apply_quality_filter(
+    metadata: Dict[str, Any],
+    scene_metrics: Dict[str, Any],
+    quality_config: Dict[str, Any],
+    preprocessed_dir: Path,
+    skip_dir: Path,
+) -> Dict[str, Any]:
+    satellites_cfg = (quality_config or {}).get("satellites") or {}
+    if not satellites_cfg:
+        return metadata
+    filtered: Dict[str, Any] = {}
+    for satname, sat_meta in metadata.items():
+        reference = satellites_cfg.get(satname)
+        if not reference:
+            filtered[satname] = sat_meta
+            continue
+        filenames = sat_meta.get("filenames", [])
+        keep: list[int] = []
+        removed = 0
+        for idx, scene_id in enumerate(filenames):
+            metrics_entry = scene_metrics.get(scene_id)
+            if _scene_meets_quality(metrics_entry, reference):
+                keep.append(idx)
+            else:
+                removed += 1
+        if removed:
+            print(f"[Imagery] Removed {removed} scenes for satellite {satname} due to quality tolerances.")
+            _copy_rejected_jpgs(filenames, keep, scene_metrics, preprocessed_dir, skip_dir)
+            filtered[satname] = _subset_metadata(sat_meta, keep)
+        else:
+            filtered[satname] = sat_meta
+    return filtered
+
+
+def _scene_meets_quality(metrics: Dict[str, Any] | None, reference: Dict[str, Any]) -> bool:
+    if not reference:
+        return True
+    if metrics is None:
+        return True
+    land = metrics.get("land_fraction")
+    water = metrics.get("water_fraction")
+    ref_land = reference.get("land_fraction")
+    ref_water = reference.get("water_fraction")
+    if land is None or water is None or ref_land is None or ref_water is None:
+        return True
+    base_tol = reference.get("base_tolerance", 0.10)
+    scene_valid = metrics.get("valid_pixels")
+    ref_valid = reference.get("valid_pixels") or scene_valid
+    if scene_valid and ref_valid:
+        ratio = max(ref_valid / max(scene_valid, 1), 1.0)
+        effective_tol = min(0.5, base_tol * ratio)
+    else:
+        effective_tol = base_tol
+    if abs(land - ref_land) > effective_tol:
+        return False
+    if abs(water - ref_water) > effective_tol:
+        return False
+    return True
+
+
+def _subset_metadata(meta: Dict[str, Any], indices: list[int]) -> Dict[str, Any]:
+    subset: Dict[str, Any] = {}
+    for key, value in meta.items():
+        if isinstance(value, list):
+            subset[key] = [value[i] for i in indices]
+        elif isinstance(value, np.ndarray):
+            subset[key] = value[indices]
+        else:
+            subset[key] = value
+    return subset
+
+
+def _copy_rejected_jpgs(
+    filenames: list[str],
+    keep_indices: list[int],
+    scene_metrics: Dict[str, Any],
+    preprocessed_dir: Path,
+    skip_dir: Path,
+) -> None:
+    keep_set = set(keep_indices)
+    copied = 0
+    skip_dir.mkdir(parents=True, exist_ok=True)
+    for idx, scene_id in enumerate(filenames):
+        if idx in keep_set:
+            continue
+        metrics_entry = scene_metrics.get(scene_id)
+        if not metrics_entry:
+            continue
+        date = metrics_entry.get("date")
+        sat = metrics_entry.get("satellite")
+        if not date or not sat:
+            continue
+        source = preprocessed_dir / f"{date}_{sat}.jpg"
+        if not source.exists():
+            continue
+        destination = skip_dir / source.name
+        try:
+            shutil.copy2(source, destination)
+            copied += 1
+        except Exception:
+            continue
+    if copied:
+        print(f"[Imagery] Copied {copied} rejected scenes to {skip_dir}.")
