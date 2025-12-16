@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import json
 import sys
+import os
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -235,7 +236,30 @@ def run_analysis_from_config(config_path: Path, engine: str = "legacy") -> int:
     else:
         script = "Complete_Analysis.py"
 
-    cmd = ["python", script, "--config", str(config_path)]
-    typer.echo(f"\n→ Running analysis: {' '.join(cmd)}")
-    result = subprocess.run(cmd)
-    return result.returncode
+    cmd = [sys.executable, "-u", script, "--config", str(config_path)]
+    typer.echo(f"\n-> Running analysis: {' '.join(cmd)}")
+
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+
+    # Stream child output so progress updates (including carriage returns) appear live in Gooey.
+    with subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=0,
+        env=env,
+    ) as proc:
+        assert proc.stdout is not None
+        while True:
+            ch = proc.stdout.read(1)
+            if ch == "":
+                break
+            if ch == "\r":
+                # Map carriage returns to newlines so Gooey refreshes the console.
+                sys.stdout.write("\n")
+            else:
+                sys.stdout.write(ch)
+            sys.stdout.flush()
+        return proc.wait()

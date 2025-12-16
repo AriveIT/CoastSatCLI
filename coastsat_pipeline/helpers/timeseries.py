@@ -90,8 +90,22 @@ def _despike_timeseries(cross_distance, output, settings, overrides):
 
 def _plot_seasonal_average(key, dates, chainage, settings):
     dict_seas, dates_seas, chainage_seas, list_seas = SDS_transects.seasonal_average(dates.tolist(), chainage.tolist())
-    trend, fitted = SDS_transects.calculate_trend(dates_seas, chainage_seas)
+    overall_trend, overall_fit = SDS_transects.calculate_trend(dates_seas, chainage_seas)
     season_colors = {"DJF": "C3", "MAM": "C1", "JJA": "C2", "SON": "C0"}
+
+    # Per-season regression (legacy behaviour)
+    season_trends = {}
+    season_fits = {}
+    for seas, data in dict_seas.items():
+        s_dates = data["dates"]
+        s_chain = data["chainages"]
+        if len(s_dates) > 1:
+            seas_trend, seas_fit = SDS_transects.calculate_trend(s_dates, s_chain)
+            season_trends[seas] = seas_trend
+            season_fits[seas] = seas_fit
+        else:
+            season_trends[seas] = np.nan
+            season_fits[seas] = [np.nan] * len(s_dates)
 
     fig, ax = plt.subplots(1, 1, figsize=[14, 4], tight_layout=True)
     ax.grid(which="major", linestyle=":", color="0.5")
@@ -110,8 +124,16 @@ def _plot_seasonal_average(key, dates, chainage, settings):
             label=seas,
             ms=5,
         )
+        if len(dict_seas[seas]["dates"]) > 1:
+            ax.plot(
+                dict_seas[seas]["dates"],
+                season_fits[seas],
+                "--",
+                color=season_colors.get(seas, "k"),
+                label=f"{seas} trend = {season_trends[seas]:.2f} m/yr",
+            )
 
-    ax.plot(dates_seas, fitted, "--", color="b", label=f"trend {trend:.1f} m/year")
+    ax.plot(dates_seas, overall_fit, "--", color="b", label=f"trend {overall_trend:.1f} m/year")
     ax.legend(loc="lower left", ncol=6, markerscale=1.5, frameon=True, edgecolor="k", columnspacing=1)
     fig.savefig(os.path.join(settings["inputs"]["filepath"], f"{key}_seasonal_average.jpg"))
     plt.close(fig)

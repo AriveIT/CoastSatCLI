@@ -710,8 +710,12 @@ def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None, m
         filenames = metadata[satname]['filenames']
         print('%s: %d images'%(satname,len(filenames)))
         # loop through images
+        last_pct = -1
         for i in range(len(filenames)):
-            print('\r%d%%' %int((i+1)/len(filenames)*100), end='')
+            pct = int((i + 1) / len(filenames) * 100)
+            if pct != last_pct:
+                print(f"{pct}%", flush=True)
+                last_pct = pct
             # image filename
             fn = SDS_tools.get_filenames(filenames[i],filepath, satname)
             # read and preprocess image

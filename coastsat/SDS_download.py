@@ -166,6 +166,7 @@ def retrieve_images(inputs):
         
         all_names = [] # list for detecting duplicates
         # loop through each image
+        last_pct = -1
         for i in range(len(im_dict_T1[satname])):
             
             # get image metadata
@@ -463,7 +464,11 @@ def retrieve_images(inputs):
                 for key in metadict.keys():
                     f.write('%s\t%s\n'%(key,metadict[key]))
             # print percentage completion for user
-            print('\r%d%%' %int((i+1)/len(im_dict_T1[satname])*100), end='')
+            # Emit download progress when the integer percent changes (GUI-friendly).
+            pct = int((i + 1) / len(im_dict_T1[satname]) * 100)
+            if pct != last_pct:
+                print(f"{pct}%", flush=True)
+                last_pct = pct
 
         print('')
 

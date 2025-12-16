@@ -35,3 +35,4 @@ dependencies:
   - gdown
   - pip:
     - typer-cli
+    - Gooey

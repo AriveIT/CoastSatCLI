@@ -18,13 +18,24 @@ class PipelineRunner:
         self.stages: List[PipelineStage] = list(stages)
 
     def run(self, context: PipelineContext) -> None:
-        for stage in self.stages:
+        total_stages = len(self.stages)
+        if total_stages == 0:
+            print("PROGRESS: 100%")
+            return
+
+        for idx, stage in enumerate(self.stages):
+            ran = False
             if not stage.should_run(context):
                 logger.info("Skipping stage %s", stage.name)
-                continue
-            stage.log_start()
-            stage.run(context)
-            stage.log_end()
+            else:
+                stage.log_start()
+                stage.run(context)
+                stage.log_end()
+                ran = True
+
+            pct = int(((idx + 1) / total_stages) * 100)
+            print(f"STAGE: {stage.name} ({'done' if ran else 'skipped'})")
+            print(f"PROGRESS: {pct}%")
 
 
 def run_pipeline(context: PipelineContext, stages: Iterable[PipelineStage]) -> PipelineContext:

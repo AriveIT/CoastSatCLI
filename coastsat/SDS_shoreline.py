@@ -41,13 +41,11 @@ from pylab import ginput
 from coastsat import SDS_tools, SDS_preprocess
 
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
-import time
 # Main function for batch shoreline detection
 def extract_shorelines(metadata, settings):
     """
     Main function to extract shorelines from satellite images
     """
-    start_total = time.time()
 
     sitename = settings['inputs']['sitename']
     filepath_data = settings['inputs']['filepath']
@@ -65,7 +63,6 @@ def extract_shorelines(metadata, settings):
     buffer_cache = {}
 
     for satname in metadata.keys():
-        sat_start = time.time()
 
         filepath = SDS_tools.get_filepath(settings['inputs'],satname)
         filenames = metadata[satname]['filenames']
@@ -82,7 +79,6 @@ def extract_shorelines(metadata, settings):
         if not sklearn.__version__[:4] == '0.20':
             str_new = '_new'
 
-        load_model_start = time.time()
         if satname in ['L5','L7','L8','L9']:
             pixel_size = 15
             if settings['sand_color'] == 'dark':
@@ -96,19 +92,20 @@ def extract_shorelines(metadata, settings):
         elif satname == 'S2':
             pixel_size = 10
             clf = joblib.load(os.path.join(filepath_models, 'NN_4classes_S2%s.pkl'%str_new))
-        print(f"Model loading took {time.time() - load_model_start:.2f} seconds")
 
         min_beach_area_pixels = np.ceil(settings['min_beach_area']/pixel_size**2)
         settings['min_length_sl'] = 200 if satname == 'L7' else default_min_length_sl
 
+        last_pct = -1
         for i in range(len(filenames)):
-            print('\r%s:   %d%%' % (satname,int(((i+1)/len(filenames))*100)), end='')
+            pct = int(((i + 1) / len(filenames)) * 100)
+            if pct != last_pct:
+                print(f"{satname}: {pct}%", flush=True)
+                last_pct = pct
 
             fn = SDS_tools.get_filenames(filenames[i], filepath, satname)
-            prep_start = time.time()
             im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = SDS_preprocess.preprocess_single(
                 fn, satname, settings['cloud_mask_issue'], settings['pan_off'], settings['s2cloudless_prob'])
-            print(f"  | Preprocessing: {time.time() - prep_start:.2f}s", end='')
 
             image_epsg = metadata[satname]['epsg'][i]
 
@@ -122,7 +119,6 @@ def extract_shorelines(metadata, settings):
             if cloud_cover > settings['cloud_thresh']:
                 continue
 
-            buffer_start = time.time()
             buffer_key = (tuple(cloud_mask.shape), tuple(np.round(georef, 6)))
 
             if buffer_key in buffer_cache:
@@ -132,13 +128,9 @@ def extract_shorelines(metadata, settings):
                 print("  | Buffer (computed)", end='')
                 im_ref_buffer = create_shoreline_buffer(cloud_mask.shape, georef, image_epsg, settings)
                 buffer_cache[buffer_key] = im_ref_buffer
-            print(f"  | Buffer: {time.time() - buffer_start:.2f}s", end='')
 
-            classify_start = time.time()
             im_classif, im_labels = classify_image_NN(im_ms, cloud_mask, min_beach_area_pixels, clf)
-            print(f"  | Classify: {time.time() - classify_start:.2f}s", end='')
 
-            map_start = time.time()
             if settings['adjust_detection']:
                 date = filenames[i][:19]
                 skip_image, shoreline, t_mndwi = adjust_detection(im_ms, cloud_mask, im_nodata, im_labels,
@@ -156,12 +148,9 @@ def extract_shorelines(metadata, settings):
                 except Exception as e:
                     print(f'Could not map shoreline for this image: {filenames[i]}, reason: {e}')
                     continue
-            print(f"  | Map shoreline: {time.time() - map_start:.2f}s")
 
-            process_start = time.time()
             shoreline = process_shoreline(contours_mwi, cloud_mask_adv, im_nodata,
                                           georef, image_epsg, settings)
-            print(f"  | Process: {time.time() - process_start:.2f}s")
 
             if settings['check_detection'] or settings['save_figure']:
                 date = filenames[i][:19]
@@ -189,7 +178,6 @@ def extract_shorelines(metadata, settings):
             'idx': output_idxkeep,
             'MNDWI_threshold': output_t_mndwi,
         }
-        print(f"\n{satname} batch took {time.time() - sat_start:.2f} seconds\n")
 
     if plt.get_fignums():
         plt.close()
@@ -200,7 +188,6 @@ def extract_shorelines(metadata, settings):
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)
 
-    print(f"Total extraction time: {time.time() - start_total:.2f} seconds")
     return output
 ###################################################################################################
 # IMAGE CLASSIFICATION FUNCTIONS
