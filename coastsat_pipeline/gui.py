@@ -19,6 +19,8 @@ from .cli import run_pipeline_from_config
 class _TextHandler(logging.Handler):
     """
     Logging handler that appends log messages to a Tkinter Text widget.
+
+    This lets pipeline logs stream into the GUI without blocking the UI thread.
     """
 
     def __init__(self, text_widget: tk.Text):
@@ -41,6 +43,9 @@ class _TextHandler(logging.Handler):
 class PipelineGUI:
     """
     Thin desktop shell to run the refactored pipeline from a settings.json.
+
+    The GUI is intentionally minimal: pick a config, run pipeline in a worker
+    thread, and surface logs/progress/messages to the user.
     """
 
     def __init__(self) -> None:

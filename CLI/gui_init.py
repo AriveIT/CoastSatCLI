@@ -48,6 +48,7 @@ def _split_paths(raw: str) -> List[str]:
 
 
 def _validate_numeric(args) -> None:
+    """Validate numeric GUI inputs early so we can fail fast with a clear message."""
     if args.transect_spacing <= 0:
         raise ValueError("Transect spacing must be > 0.")
     if args.transect_length <= 0:
@@ -68,6 +69,9 @@ def _validate_numeric(args) -> None:
 
 
 def _build_tide_config(args) -> dict:
+    """
+    Normalize tide inputs from the GUI into the shape expected by init helpers.
+    """
     tide_config: dict = {"method": args.tide_method}
     if args.tide_method == "fes":
         tide_config["fes_config"] = args.fes_config
@@ -84,6 +88,9 @@ def _build_tide_config(args) -> dict:
 
 
 def _detect_epsg(aoi_path: Path, manual_epsg: int | None) -> int:
+    """
+    Try to auto-pick a Canadian UTM EPSG; allow manual override from the GUI.
+    """
     if manual_epsg:
         return manual_epsg
     try:
@@ -101,6 +108,10 @@ def _init_site(
     epsg: int,
     transect_opts: dict,
 ) -> dict:
+    """
+    Core init routine: scaffold folders, clip shoreline to AOI, generate transects,
+    write settings.json, and copy inputs into place. Returns paths for display.
+    """
     paths = setup_project_directories(str(base_dir), sitename)
     site_dir = Path(paths["site_dir"])
     input_dir = Path(paths["input_dir"])
@@ -178,6 +189,7 @@ def main() -> None:
     parser.add_argument("--aoi", widget="FileChooser", help="AOI KML (single mode).")
     parser.add_argument("--aois", widget="MultiFileChooser", help="AOI KML files (batch mode).")
 
+    # Tide inputs: choose FES or CSV, optional filter.
     tide_group = parser.add_argument_group("Tide correction")
     tide_group.add_argument("--tide_method", choices=["fes", "csv"], default="fes", help="Choose tide correction mode.")
     tide_group.add_argument("--fes_config", widget="FileChooser", help="FES2022 YAML config (for FES mode).")
@@ -192,6 +204,7 @@ def main() -> None:
     epsg_group = parser.add_argument_group("EPSG")
     epsg_group.add_argument("--epsg", type=int, help="Manual EPSG override. Leave blank to auto-detect from AOI.")
 
+    # Transect geometry controls (advanced).
     tran_group = parser.add_argument_group("Transects (advanced)")
     tran_group.add_argument("--transect_spacing", default=100.0, type=float, help="Spacing between transects (m).")
     tran_group.add_argument("--transect_length", default=200.0, type=float, help="Transect total length (m).")

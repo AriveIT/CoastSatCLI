@@ -12,6 +12,11 @@ logger = logging.getLogger(__name__)
 class PipelineRunner:
     """
     Executes a sequence of pipeline stages.
+
+    Responsibilities:
+    - Honor each stage's should_run predicate.
+    - Run/log each stage in order and surface progress markers for UIs.
+    - Leave populated context for downstream consumers.
     """
 
     def __init__(self, stages: Iterable[PipelineStage]):

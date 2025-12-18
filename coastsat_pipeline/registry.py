@@ -18,8 +18,11 @@ from .stages import (
 
 def default_stages() -> List[PipelineStage]:
     """
-    Factory returning the default stage sequence.
-    Currently includes the implemented stages; more will be added as they migrate.
+    Default ordered set of pipeline stages.
+
+    Each stage expects outputs from the previous stage to be present in
+    PipelineContext (e.g., config -> init -> imagery -> analysis). When new
+    stages are added, append them here in the order they should execute.
     """
     return [
         ConfigLoadStage(),

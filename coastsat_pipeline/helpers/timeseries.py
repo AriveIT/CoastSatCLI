@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class TimeSeriesOptions:
+    """Tuning switches for time-series post-processing outputs."""
     write_csv: bool = True
     save_seasonal_plots: bool = True
     save_monthly_plots: bool = True
@@ -22,6 +23,7 @@ class TimeSeriesOptions:
 
 @dataclass
 class TimeSeriesResult:
+    """Summary of processed transect time-series."""
     cross_distance: Dict[str, np.ndarray]
     trend_dict: Dict[str, float]
     processed_transects: int
@@ -41,6 +43,7 @@ def run_time_series_post_processing(
     if options.write_csv:
         _write_time_series_csv(transects, cross_distance, dates, settings)
 
+    # Reject spikes/outliers before computing trends and plots.
     cross_distance = _despike_timeseries(cross_distance, output, settings, options.outlier_settings)
     trend_dict: Dict[str, float] = {}
     processed, skipped = 0, 0
@@ -70,6 +73,7 @@ def run_time_series_post_processing(
 
 
 def _write_time_series_csv(transects, cross_distance, dates, settings):
+    # Emit per-transect CSV time series for downstream use.
     out_dict = {"dates": dates}
     for key in transects.keys():
         out_dict[f"Transect {key}"] = cross_distance[key]
@@ -79,6 +83,7 @@ def _write_time_series_csv(transects, cross_distance, dates, settings):
 
 
 def _despike_timeseries(cross_distance, output, settings, overrides):
+    """Apply outlier rejection with either custom overrides or defaults."""
     default = {
         "otsu_threshold": [-0.5, 0],
         "max_cross_change": 50,
@@ -89,9 +94,14 @@ def _despike_timeseries(cross_distance, output, settings, overrides):
 
 
 def _plot_seasonal_average(key, dates, chainage, settings):
+    """Plot seasonal averages and seasonal trends for a transect."""
     dict_seas, dates_seas, chainage_seas, list_seas = SDS_transects.seasonal_average(dates.tolist(), chainage.tolist())
     overall_trend, overall_fit = SDS_transects.calculate_trend(dates_seas, chainage_seas)
     season_colors = {"DJF": "C3", "MAM": "C1", "JJA": "C2", "SON": "C0"}
+
+    # 6-month moving average for smoother seasonal visualization (independent of trend).
+    df_ma = pd.DataFrame({"date": pd.to_datetime(dates), "value": chainage}).sort_values("date")
+    ma = df_ma.set_index("date")["value"].rolling("180D", min_periods=2, center=True).mean()
 
     # Per-season regression (legacy behaviour)
     season_trends = {}
@@ -113,6 +123,8 @@ def _plot_seasonal_average(key, dates, chainage, settings):
     ax.set(ylabel="distance [m]")
     ax.plot(dates, chainage, "+", lw=1, color="k", mfc="w", ms=4, alpha=0.5, label="raw datapoints")
     ax.plot(dates_seas, chainage_seas, "-", lw=1, color="k", mfc="w", ms=4, label="seasonally-averaged")
+    if ma.notna().sum() > 1:
+        ax.plot(ma.index, ma.values, color="darkorange", lw=1.5, label="6-mo moving avg")
 
     for seas in dict_seas.keys():
         ax.plot(
@@ -140,6 +152,7 @@ def _plot_seasonal_average(key, dates, chainage, settings):
 
 
 def _plot_monthly_average(key, dates, chainage, settings):
+    """Plot monthly averages for a transect."""
     dict_month, dates_month, chainage_month, list_month = SDS_transects.monthly_average(dates.tolist(), chainage.tolist())
     month_colors = plt.get_cmap("tab20")
 

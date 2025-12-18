@@ -10,7 +10,12 @@ logger = logging.getLogger(__name__)
 
 class PipelineStage(ABC):
     """
-    Base class for stages. Subclasses can override should_run to skip themselves.
+    Base class for stages.
+
+    Contract:
+    - Implement run(context) to perform work and populate context.
+    - Override should_run(context) when a stage can be skipped based on inputs.
+    - Use log_start/log_end for consistent progress messages.
     """
 
     name: str = "stage"

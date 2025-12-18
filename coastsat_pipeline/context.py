@@ -7,12 +7,14 @@ from typing import Any, Dict, List, Optional
 
 @dataclass
 class TideFilterConfig:
+    """Optional percentile filter applied to tide series."""
     lower_percentile: float
     upper_percentile: float
 
 
 @dataclass
 class TideConfig:
+    """Normalized tide configuration from settings.json."""
     mode: str  # "fes", "csv", or "none"
     fes_config: Optional[Path] = None
     tide_csv_path: Optional[Path] = None
@@ -23,6 +25,7 @@ class TideConfig:
 
 @dataclass
 class InputsConfig:
+    """Input file references for a site."""
     sitename: str
     aoi_path: Path
     reference_shoreline: Path
@@ -32,6 +35,7 @@ class InputsConfig:
 
 @dataclass
 class Settings:
+    """Typed settings view loaded from settings.json."""
     raw: Dict[str, Any]
     inputs: InputsConfig
     output_dir: Path
@@ -43,6 +47,11 @@ class Settings:
 class PipelineContext:
     """
     Shared state passed between pipeline stages.
+
+    Each stage reads/writes attributes here instead of returning large tuples.
+    Stages should check for required fields (or use require_settings) before
+    proceeding. Keep additions backwards compatible: prefer adding new fields
+    over mutating existing ones.
     """
 
     config_path: Path
