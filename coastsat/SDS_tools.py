@@ -788,9 +788,8 @@ def transects_from_geojson(filename):
     transects = dict([])
     for i in gdf.index:
         transect_coords = np.array(gdf.loc[i, 'geometry'].coords)
-        reversed_coords = transect_coords[::-1]  # Reverse the coordinates
+        transects[gdf.loc[i, 'name']] = transect_coords
         
-        transects[gdf.loc[i, 'name']] = reversed_coords
     print('%d transects have been loaded'%len(transects.keys()), end=' ')
     print('\ncoordinates are in epsg:%d'%gdf.crs.to_epsg())
 
