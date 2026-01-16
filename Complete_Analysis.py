@@ -112,7 +112,7 @@ def initial_settings(config):
 
     # TODO: Set sat list and date range
     # Satellites
-    sat_list = ['L5', 'L7', 'L8', 'L9']
+    sat_list = ['L5', 'L7', 'L8', 'L9', 'S2'] # S2 = Sentinel 2 (noisy data)
     # Name of the site
     sitename = config['inputs']['sitename']  
 
@@ -157,7 +157,7 @@ def initial_settings(config):
         'min_beach_area': 500,  # Minimum area (in metres^2) for an object to be labelled as a beach
         'min_length_sl': 250,  # Minimum length (in metres) of shoreline perimeter to be valid
         'cloud_mask_issue': False,  # Switch this parameter to True if sand pixels are masked (in black) on many images
-        'sand_color': 'default',  # 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
+        'sand_color': 'latest',  # 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
         'pan_off': False,  # True to switch pansharpening off for Landsat 7/8/9 imagery
         's2cloudless_prob': 20,  # Threshold to identify cloud pixels in the s2cloudless probability mask
         # Add the inputs defined previously
