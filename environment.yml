@@ -1,4 +1,4 @@
-name: coastsat
+name: coastsatrf
 channels:
   - conda-forge
 dependencies:

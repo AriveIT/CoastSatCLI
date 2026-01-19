@@ -176,7 +176,7 @@ def batch_shoreline_detection(metadata, settings, inputs):
     Returns the output dictionary.
     """
     # Preprocess images (cloud masking, pansharpening/down-sampling)
-    SDS_preprocess.save_jpg(metadata, settings, use_matplotlib=True)
+    # SDS_preprocess.save_jpg(metadata, settings, use_matplotlib=True) ####################################### COMMENTED FOR DEBUGGING, NEED TO UNCOMMENT
     # create MP4 timelapse animation
     print("[Step 4] Generating RGB time-lapse animation (this may take several minutes)...")
     #fn_animation = os.path.join(inputs['filepath'], '%s_animation_RGB.gif'%inputs['sitename'])
