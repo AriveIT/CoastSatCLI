@@ -171,7 +171,7 @@ def closest_intersection(segment: LineString, shoreline_union, origin_point: Poi
 def generate_transects_along_line(clipped_gdf: gpd.GeoDataFrame, spacing=50, length=200, offset_ratio=0.75, skip_threshold=500.0, min_valid_transect=50.0) -> gpd.GeoDataFrame:
     """Generate perpendicular transects at fixed spacing along the dissolved shoreline.
 
-    offset_ratio: proportion of transect extending landward (e.g., 0.25 = 25% landward, 75% seaward)
+    offset_ratio: proportion of transect extending seaward (e.g., 0.75 = 75% seaward, 25% landward)
     """
     transects = []
     names = []
@@ -218,20 +218,20 @@ def generate_transects_along_line(clipped_gdf: gpd.GeoDataFrame, spacing=50, len
                 continue
 
             # Calculate base points based on offset ratio
-            inland = offset_ratio * length
-            seaward = (1 - offset_ratio) * length
+            seaward = offset_ratio * length
+            inland = (1 - offset_ratio) * length
 
             # Get actual end points of the transect
-            inland_pt_actual = Point(point.x - normal[0] * inland, point.y - normal[1] * inland)
-            seaward_pt_actual = Point(point.x + normal[0] * seaward, point.y + normal[1] * seaward)
+            seaward_pt_actual = Point(point.x - normal[0] * seaward, point.y - normal[1] * seaward)
+            inland_pt_actual = Point(point.x + normal[0] * inland, point.y + normal[1] * inland)
 
             # Define initial segments
-            inland_segment = LineString([point, inland_pt_actual])
             seaward_segment = LineString([point, seaward_pt_actual])
+            inland_segment = LineString([point, inland_pt_actual])
 
             # Get closest intersections
-            inland_inter_dist = closest_intersection(inland_segment, shoreline_union, point)
             seaward_inter_dist = closest_intersection(seaward_segment, shoreline_union, point)
+            inland_inter_dist = closest_intersection(inland_segment, shoreline_union, point)
 
             # Skip transect if both directions are obstructed early
             if (seaward_inter_dist and seaward_inter_dist < min_valid_transect) or \
@@ -240,15 +240,15 @@ def generate_transects_along_line(clipped_gdf: gpd.GeoDataFrame, spacing=50, len
                 continue
 
             # Shorten if intersections are found
-            if inland_inter_dist:
-                shorten_by = inland_inter_dist * 0.5
-                inland_pt_actual = Point(point.x - normal[0] * shorten_by, point.y - normal[1] * shorten_by)
-
             if seaward_inter_dist:
                 shorten_by = seaward_inter_dist * 0.5
-                seaward_pt_actual = Point(point.x + normal[0] * shorten_by, point.y + normal[1] * shorten_by)
+                seaward_pt_actual = Point(point.x - normal[0] * shorten_by, point.y - normal[1] * shorten_by)
 
-            transects.append(LineString([seaward_pt_actual, inland_pt_actual]))
+            if inland_inter_dist:
+                shorten_by = inland_inter_dist * 0.5
+                inland_pt_actual = Point(point.x + normal[0] * shorten_by, point.y + normal[1] * shorten_by)
+
+            transects.append(LineString([inland_pt_actual, seaward_pt_actual]))
             names.append(f"transect_{transect_id:03d}")  # Zero-padded names
             transect_id += 1
 

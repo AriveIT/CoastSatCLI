@@ -702,38 +702,68 @@ def polygon_from_geojson(fn):
     polygon = [[[_[0], _[1]] for _ in coords]]
     return polygon
 
+# def polygon_from_kml(fn):
+#     """
+#     Extracts coordinates from a .kml file.
+    
+#     KV WRL 2018
+
+#     Arguments:
+#     -----------
+#     fn: str
+#         filepath + filename of the kml file to be read          
+                
+#     Returns:    
+#     -----------
+#     polygon: list
+#         coordinates extracted from the .kml file
+        
+#     """    
+    
+#     # read .kml file
+#     with open(fn) as kmlFile:
+#         doc = kmlFile.read() 
+#     # parse to find coordinates field
+#     str1 = '<coordinates>'
+#     str2 = '</coordinates>'
+#     subdoc = doc[doc.find(str1)+len(str1):doc.find(str2)]
+#     coordlist = subdoc.split('\n')
+#     # read coordinates
+#     polygon = []
+#     for i in range(1,len(coordlist)-1):
+#         polygon.append([float(coordlist[i].split(',')[0]), float(coordlist[i].split(',')[1])])
+        
+#     return [polygon]
+
+# Jaime---
 def polygon_from_kml(fn):
     """
-    Extracts coordinates from a .kml file.
-    
-    KV WRL 2018
+    Extract coordinates from a .kml file NEW
+    """
+    with open(fn, "r", encoding="utf-8") as f:
+        doc = f.read()
+    str1 = "<coordinates>"
+    str2 = "</coordinates>"
+    i1 = doc.find(str1)
+    i2 = doc.find(str2)
+    if i1==-1 or i2==-1 or i2<=i1:
+        raise ValueError(f"Couldn't find <coordinates>...</coordinates> in KML: {fn}")
 
-    Arguments:
-    -----------
-    fn: str
-        filepath + filename of the kml file to be read          
-                
-    Returns:    
-    -----------
-    polygon: list
-        coordinates extracted from the .kml file
-        
-    """    
-    
-    # read .kml file
-    with open(fn) as kmlFile:
-        doc = kmlFile.read() 
-    # parse to find coordinates field
-    str1 = '<coordinates>'
-    str2 = '</coordinates>'
-    subdoc = doc[doc.find(str1)+len(str1):doc.find(str2)]
-    coordlist = subdoc.split('\n')
-    # read coordinates
-    polygon = []
-    for i in range(1,len(coordlist)-1):
-        polygon.append([float(coordlist[i].split(',')[0]), float(coordlist[i].split(',')[1])])
-        
-    return [polygon]
+    subdoc = doc[i1 + len(str1): i2].strip()
+    # KML coordinates separated by spaces and or newlines
+    tokens = subdoc.replace("\n", " ").replace("\t", " ").split()
+    ring = []
+    for tok in tokens:
+        parts = tok.split(",")
+        if len(parts)<2:
+            continue
+        x = float(parts[0])
+        y = float(parts[1])
+        ring.append([x, y])
+    if len(ring) < 4:
+        raise ValueError(f"AOI ring does not have enough coords ({len(ring)}). Parsed: {ring}")
+    return [ring]
+# ---Jaime
 
 def transects_from_geojson(filename):
     """
@@ -758,9 +788,8 @@ def transects_from_geojson(filename):
     transects = dict([])
     for i in gdf.index:
         transect_coords = np.array(gdf.loc[i, 'geometry'].coords)
-        reversed_coords = transect_coords[::-1]  # Reverse the coordinates
+        transects[gdf.loc[i, 'name']] = transect_coords
         
-        transects[gdf.loc[i, 'name']] = reversed_coords
     print('%d transects have been loaded'%len(transects.keys()), end=' ')
     print('\ncoordinates are in epsg:%d'%gdf.crs.to_epsg())
 
