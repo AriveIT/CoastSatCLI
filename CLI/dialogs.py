@@ -6,6 +6,7 @@ import subprocess
 import json
 import sys
 import os
+import traceback
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
@@ -225,6 +226,7 @@ def run_analysis_from_config(config_path: Path, engine: str = "legacy") -> int:
             return 0
         except Exception as exc:
             typer.secho(f"Pipeline run failed: {exc}", fg=typer.colors.RED)
+            traceback.print_exc()
             return 1
 
     with open(config_path) as f:
@@ -241,25 +243,33 @@ def run_analysis_from_config(config_path: Path, engine: str = "legacy") -> int:
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
 
-    # Stream child output so progress updates (including carriage returns) appear live in Gooey.
     with subprocess.Popen(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        bufsize=0,
-        env=env,
-    ) as proc:
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,  # Line-buffering
+            env=env,
+        ) as proc:
         assert proc.stdout is not None
+        output_buffer = bytearray()  # Use a byte array to handle raw output
+
         while True:
             ch = proc.stdout.read(1)
-            if ch == "":
+            if ch == b"":  # Handle bytes instead of str
                 break
-            if ch == "\r":
-                # Map carriage returns to newlines so Gooey refreshes the console.
+            if ch == b"\r":  # Carriage return
+                if output_buffer:
+                    sys.stdout.write(output_buffer.decode('utf-8'))  # Decode the buffer
+                    output_buffer.clear()
                 sys.stdout.write("\n")
             else:
-                sys.stdout.write(ch)
-            sys.stdout.flush()
-        return proc.wait()
+                output_buffer.extend(ch)  # Gather bytes
+
+        # Output any remaining characters
+        if output_buffer:
+            sys.stdout.write(output_buffer.decode('utf-8'))
+        sys.stdout.flush()
+
+    return proc.wait()

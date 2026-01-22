@@ -44,6 +44,8 @@ def run_slope_estimation(
         tide_stats,
     ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance)
 
+
+
     slope_est, cis = _estimate_slopes(
         fp_slopes,
         filtered_dates_sat,
@@ -53,7 +55,7 @@ def run_slope_estimation(
     )
 
     settings["tide_filter_stats"] = {**settings.get("tide_filter_stats", {}), **tide_stats}
-    return slope_est, dates_sat, tides_sat
+    return slope_est, dates_sat, tides_sat, filtered_output
 
 
 def _filter_output(output: Dict[str, Any]) -> Dict[str, Any]:
@@ -125,6 +127,7 @@ def _apply_tide_filters(
     settings_slope = settings.setdefault("slope_settings", {})
     settings_slope["n_days"] = 8
 
+    # percentile filter
     tide_filter_cfg = settings.get("tide_filter")
     tide_filter_mask = np.ones_like(tides_sat, dtype=bool)
     tide_thresholds = {}
@@ -147,7 +150,8 @@ def _apply_tide_filters(
         tide_thresholds["removed_acquisitions"] = removed
         tide_thresholds["total_acquisitions"] = total
 
-    date_start = pytz.utc.localize(datetime(1984, 1, 1))
+    # get all dates in given range in utc time zone
+    date_start = pytz.utc.localize(datetime(2020, 1, 1))
     date_end = pytz.utc.localize(datetime(2025, 1, 1))
     normalized_dates: list[datetime] = [
         _ensure_aware(raw_date) for raw_date in dates_sat
@@ -160,7 +164,8 @@ def _apply_tide_filters(
     selected_indices = np.where(combined_mask)[0]
     if selected_indices.size == 0:
         selected_indices = np.where(idx_dates)[0] if np.any(idx_dates) else np.arange(len(dates_sat))
-    print("4")
+        print("No acquisition dates fall within the slope estimation window; removing tide filters or using all dates instead.")
+
     settings.setdefault("tide_filter_stats", {})["used_for_slopes"] = int(selected_indices.size)
     filtered_dates_sat = [dates_sat[i] for i in selected_indices]
     filtered_tides_sat = tides_sat[selected_indices]
@@ -187,7 +192,46 @@ def _estimate_slopes(
     filtered_cross_distance,
     save_figures: bool,
 ):
-    settings_slope = {"plot_fig": save_figures}
+    settings_slope = {
+        'slope_min': 0.005,
+        'slope_max': 0.4,
+        'delta_slope': 0.005,
+        'n0': 50,
+        'freq_cutoff': 1. / (24 * 3600 * 30),  # 30-day frequency
+        'delta_f': 100 * 1e-10,
+        'prc_conf': 0.05,
+        'plot_fig': save_figures,
+        'n_days': 8
+    }
+
+    # get range of beach slopes for power_spectrum
+    beach_slopes = SDS_slope.range_slopes(settings_slope['slope_min'], settings_slope['slope_max'], settings_slope['delta_slope'])
+
+    if len(filtered_dates_sat) > 1:
+        try:
+            SDS_slope.plot_timestep(filtered_dates_sat)
+        except Exception as exc:
+            print(f"Warning: unable to plot timestep distribution after filtering: {exc}")
+        else:
+            fig = plt.gcf()
+            fig.savefig(os.path.join(fp_slopes, '0_timestep_distribution.jpg'), dpi=200)
+            plt.close(fig)
+
+        try:
+            freq_band = SDS_slope.find_tide_peak(filtered_dates_sat, filtered_tides_sat, settings_slope)
+        except Exception as exc:
+            print(f"Warning: unable to compute tidal frequency band after filtering: {exc}")
+        else:
+            fig = plt.gcf()
+            fig.savefig(os.path.join(fp_slopes, '1_tides_power_spectrum.jpg'), dpi=200)
+            plt.close(fig)
+    else:
+        print("Not enough acquisition dates to characterize timestep distribution after filtering.")
+
+    if freq_band is not None:
+        settings_slope['freqs_max'] = freq_band
+
+
     slope_est, cis = {}, {}
     for key in filtered_cross_distance.keys():
         try:
@@ -200,6 +244,7 @@ def _estimate_slopes(
             if len(dates) == 0 or len(tsall) == 0:
                 slope_est[key], cis[key] = 0.1, (0.1, 0.1)
                 continue
+            
             slope_est[key], cis[key] = SDS_slope.integrate_power_spectrum(dates, tsall, settings_slope, key)
             if save_figures:
                 plt.gcf().savefig(os.path.join(fp_slopes, f"2_energy_curve_{key}.jpg"), dpi=200)

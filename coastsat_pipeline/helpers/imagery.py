@@ -102,13 +102,14 @@ def preprocess_images(
         print(f"[Imagery] Converting {total_missing} new scenes to JPG.")
         metadata_to_process = _filter_metadata_by_indices(metadata, missing_indices)
 
-    SDS_preprocess.save_jpg(
-        metadata_to_process,
-        settings,
-        use_matplotlib=True,
-        debug_skipped_dir=debug_dir,
-        metrics_callback=metrics_buffer.append,
-    )
+    ################################################################################################################# Commented for debugging
+    # SDS_preprocess.save_jpg(
+    #     metadata_to_process,
+    #     settings,
+    #     use_matplotlib=True,
+    #     debug_skipped_dir=debug_dir,
+    #     metrics_callback=metrics_buffer.append,
+    # )
     _update_jpg_manifest(manifest, metadata_to_process, manifest_path)
     _update_scene_metrics(scene_metrics, metrics_buffer, scene_metrics_file)
     if imagery_opts.get("prompt_for_ideal_selection", False):

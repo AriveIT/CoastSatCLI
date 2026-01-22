@@ -6,6 +6,8 @@ from typing import Iterable, List, Optional
 from .context import PipelineContext
 from .stage import PipelineStage
 
+from . import saver
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +35,7 @@ class PipelineRunner:
             if not stage.should_run(context):
                 logger.info("Skipping stage %s", stage.name)
             else:
+                saver.save_context(context, "pre-" + stage.name)
                 stage.log_start()
                 stage.run(context)
                 stage.log_end()

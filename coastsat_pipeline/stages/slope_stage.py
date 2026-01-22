@@ -19,8 +19,9 @@ class SlopeEstimationStage(PipelineStage):
         if settings is None or cross_distance is None or output is None:
             raise RuntimeError("SlopeEstimationStage requires cross_distance, shoreline_output, and settings.")
 
-        slope_est, dates_sat, tides_sat = run_slope_estimation(settings, cross_distance, output)
+        slope_est, dates_sat, tides_sat, filtered_output = run_slope_estimation(settings, cross_distance, output)
 
         context.slope_est = slope_est
         context.dates_sat = dates_sat
         context.tides_sat = tides_sat
+        context.shoreline_output = filtered_output
