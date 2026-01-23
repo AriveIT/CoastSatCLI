@@ -13,7 +13,6 @@ from coastsat_pipeline.registry import default_stages
 from coastsat_pipeline.runner import PipelineRunner
 
 from coastsat_pipeline.checkpoints import load_context, get_cp_directory, get_stage_name_from_file_name
-import re # regex
 import os # file manipulation
 import sys # command line args
 
@@ -67,7 +66,6 @@ def _get_stages_to_run(target_stage_name):
     return stages_to_run
 
 if __name__ == "__main__":
-    # NOTE: checkpoint file names are just <stage_name>.pkl
     if len(sys.argv) == 1:
         run_from_last_cp()
     else:

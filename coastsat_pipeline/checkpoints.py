@@ -18,7 +18,7 @@ def load_context(stage_name):
         exit()
 
 def get_stage_name_from_file_name(file_name):
-    # pkl files have format <stage_name>.pkl so want before .
+    # pkl files have format <stage_name>.pkl so want everything before the .
     # indexing removes - (simplifies regex)
     return re.search(r'.*\.', file_name).group()[:-1]
 
