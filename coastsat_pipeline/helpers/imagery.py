@@ -119,7 +119,6 @@ def preprocess_images(
             enable_prompt=True,
             jpg_dir=Path(settings["inputs"]["filepath"]) / "jpg_files" / "preprocessed",
         )
-    print("[Step 4] Generating RGB time-lapse animation (this may take several minutes)...")
 
 
 def load_cached_output(settings: Dict[str, Any], cache_enabled: bool = True) -> Optional[Dict[str, Any]]:
