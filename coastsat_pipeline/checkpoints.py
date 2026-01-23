@@ -1,7 +1,7 @@
 import pickle    
 import re
 
-# saved (and assumed) checkpoint pkl files names are <stage_name>.pkl
+# saved (and assumed) checkpoint pkl file names are <stage_name>.pkl
 
 def save_context(context, stage_name):
     filename = get_cp_directory() + '/' + stage_name + ".pkl"
