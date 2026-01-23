@@ -98,7 +98,7 @@ def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any]):
     centroid = SDS_tools.select_valid_centroid(aoi_geom, ocean_tide, load_tide)
 
     date_range = [
-        pytz.utc.localize(datetime(1984, 1, 1)),
+        pytz.utc.localize(datetime(2020, 1, 1)),
         pytz.utc.localize(datetime(2025, 1, 1)),
     ]
     timestep = 900
@@ -240,8 +240,10 @@ def _estimate_slopes(
             tide = np.array(filtered_tides_sat)[~idx_nan]
             composite = np.array(filtered_cross_distance[key])[~idx_nan]
 
-            tsall = SDS_slope.tide_correct(composite, tide, 0.1)
+            tsall = SDS_slope.tide_correct(composite, tide, beach_slopes)
             if len(dates) == 0 or len(tsall) == 0:
+                print(f"Skipping transect {key} due to empty data.")
+                print(f"Setting default slope for {key} to 0.1 due to error.")
                 slope_est[key], cis[key] = 0.1, (0.1, 0.1)
                 continue
             
@@ -252,6 +254,9 @@ def _estimate_slopes(
                 SDS_slope.plot_spectrum_all(dates, composite, tsall, settings_slope, slope_est[key])
                 plt.gcf().savefig(os.path.join(fp_slopes, f"3_slope_spectrum_{key}.jpg"), dpi=200)
                 plt.close()
-        except Exception:
+            print(f"  → {key}: Estimated slope = {slope_est[key]:.3f} m (CI: {cis[key][0]:.4f} – {cis[key][1]:.4f})")
+        except Exception as e:
+            print(f'Error processing {key}: {e}')
+            print(f"Setting default slope for {key} to 0.1 due to error.")
             slope_est[key], cis[key] = 0.1, (0.1, 0.1)
     return slope_est, cis
