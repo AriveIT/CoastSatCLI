@@ -83,7 +83,16 @@ def _compute_cross_distance(output: Dict[str, Any], transects: Dict[str, Any]) -
         "multiple_inter": "max",
         "auto_prc": 0.1,
     }
-    return SDS_transects.compute_intersection_QC(output, transects, settings_transects)
+    cross_distance = SDS_transects.compute_intersection_QC(output, transects, settings_transects)
+
+    settings_outliers = {
+        "max_cross_change": 40,
+        "otsu_threshold": [-0.5, 0],
+        "plot_fig": False,
+    }
+    cross_distance = SDS_transects.reject_outliers(cross_distance, output, settings_outliers)
+
+    return cross_distance
 
 
 def _plot_time_series(output: Dict[str, Any], cross_distance: Dict[str, Any], settings: Dict[str, Any]) -> None:
@@ -118,7 +127,7 @@ def _plot_time_series(output: Dict[str, Any], cross_distance: Dict[str, Any], se
     plt.close(fig)
 
 
-def _write_time_series_csv(output: Dict[str, Any], cross_distance: Dict[str, Any], settings: Dict[str, Any]) -> None:
+def _write_time_series_csv(output: Dict[str, Any], cross_distance: Dict[str, Any], settings: Dict[str, Any], name: str="transect_time_series.csv") -> None:
     series_lengths = [len(output.get("dates", []))]
     series_lengths.extend(len(values) for values in cross_distance.values())
     target_len = max(series_lengths) if series_lengths else 0
@@ -135,5 +144,5 @@ def _write_time_series_csv(output: Dict[str, Any], cross_distance: Dict[str, Any
         out_dict[f"Transect {key}"] = _pad(list(cross_distance[key]), np.nan)
 
     df = pd.DataFrame(out_dict)
-    target = os.path.join(settings["inputs"]["filepath"], "transect_time_series.csv")
+    target = os.path.join(settings["inputs"]["filepath"], name)
     df.to_csv(target, sep=",")

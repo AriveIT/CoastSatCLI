@@ -426,7 +426,7 @@ def reject_outliers(cross_distance, output, settings):
     
     chain_dict = dict([])
 
-    print("[Step 8] Cleaning time series data (removing outliers)...")
+    print("Cleaning time series data (removing outliers)...")
     
     for i,key in enumerate(list(cross_distance.keys())):
         
@@ -438,7 +438,7 @@ def reject_outliers(cross_distance, output, settings):
         idx_nonan = np.where(~np.isnan(chainage))[0]
         chainage1 = [chainage[k] for k in idx_nonan]
         dates1 = [output['dates'][k] for k in idx_nonan]
-#        satnames1 = [output['satname'][k] for k in idx_nonan]
+        # satnames1 = [output['satname'][k] for k in idx_nonan]
 
         # 2. Remove points where the MNDWI threshold is above a certain value (max_threshold)
         if np.isnan(settings['otsu_threshold'][0]):
@@ -450,11 +450,12 @@ def reject_outliers(cross_distance, output, settings):
                                                 np.array(threshold1) >= settings['otsu_threshold'][0]))[0]
             chainage2 = [chainage1[k] for k in idx_thres]
             dates2 = [dates1[k] for k in idx_thres]
-            if len(chainage2) < 30:
-                continue
         
         # 3. Remove outliers based on despiking [iterative method]
         chainage3, dates3 = identify_outliers(chainage2, dates2, settings['max_cross_change'])
+        if len(chainage3) < 30:
+            print(f"Warning: {key} has only {len(chainage3)} valid intersections, results may be untrustworthy")
+
 
         # fill with nans the indices to be removed from cross_distance
         idx_kept = []

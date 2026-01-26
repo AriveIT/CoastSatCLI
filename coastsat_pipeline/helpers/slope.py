@@ -32,8 +32,12 @@ def run_slope_estimation(
     fp_slopes = os.path.join(settings["inputs"]["filepath"], options.cache_dir_name)
     os.makedirs(fp_slopes, exist_ok=True)
 
-    filtered_output = _filter_output(output)
-    cross_distance = _compute_filtered_cross_distance(filtered_output, settings)
+    # filtered_output = _filter_output(output)
+    filtered_output = output
+
+    # selected_indices = np.where(_get_no_S2_mask(output))[0]
+    # filtered_output = output[selected_indices]
+    # cross_distance = _compute_filtered_cross_distance(filtered_output, settings)
 
     centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, filtered_output)
 
@@ -42,7 +46,7 @@ def run_slope_estimation(
         filtered_tides_sat,
         filtered_cross_distance,
         tide_stats,
-    ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance)
+    ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance, filtered_output)
 
 
 
@@ -68,6 +72,9 @@ def _filter_output(output: Dict[str, Any]) -> Dict[str, Any]:
     filtered = SDS_tools.remove_inaccurate_georef(filtered, 12)
     return filtered
 
+def _get_no_S2_mask(output: Dict[str, Any]) -> np.array:
+    return np.array([sat != 'S2' for sat in output['satname']], dtype=bool)
+
 
 def _compute_filtered_cross_distance(output: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
     transects = SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"])
@@ -81,11 +88,13 @@ def _compute_filtered_cross_distance(output: Dict[str, Any], settings: Dict[str,
         "auto_prc": 0.1,
     }
     cross_distance = SDS_transects.compute_intersection_QC(output, transects, settings_transects)
+
     settings_outliers = {
         "max_cross_change": 40,
         "otsu_threshold": [-0.5, 0],
         "plot_fig": False,
     }
+
     return SDS_transects.reject_outliers(cross_distance, output, settings_outliers)
 
 
@@ -123,6 +132,7 @@ def _apply_tide_filters(
     dates_sat,
     tides_sat,
     cross_distance,
+    output
 ):
     settings_slope = settings.setdefault("slope_settings", {})
     settings_slope["n_days"] = 8
@@ -161,6 +171,7 @@ def _apply_tide_filters(
         dtype=bool,
     )
     combined_mask = idx_dates & tide_filter_mask if tide_filter_cfg else idx_dates
+    combined_mask &= _get_no_S2_mask(output) # remove noisy S2 data
     selected_indices = np.where(combined_mask)[0]
     if selected_indices.size == 0:
         selected_indices = np.where(idx_dates)[0] if np.any(idx_dates) else np.arange(len(dates_sat))

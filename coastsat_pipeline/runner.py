@@ -36,6 +36,7 @@ class PipelineRunner:
                 logger.info("Skipping stage %s", stage.name)
             else:
                 checkpoints.save_context(context, stage.name)
+                print(f"RUNNING: {stage.name}")
                 stage.log_start()
                 stage.run(context)
                 stage.log_end()

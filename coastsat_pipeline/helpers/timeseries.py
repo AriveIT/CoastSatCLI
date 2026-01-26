@@ -43,8 +43,7 @@ def run_time_series_post_processing(
     if options.write_csv:
         _write_time_series_csv(transects, cross_distance, dates, settings)
 
-    # Reject spikes/outliers before computing trends and plots.
-    cross_distance = _despike_timeseries(cross_distance, output, settings, options.outlier_settings)
+    # Compute trends and plots. (Note: outliers have already been rejected in the analysis stage)
     trend_dict: Dict[str, float] = {}
     processed, skipped = 0, 0
 
