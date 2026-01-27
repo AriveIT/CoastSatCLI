@@ -15,12 +15,10 @@ from shapely.geometry import Polygon
 
 from coastsat import SDS_slope, SDS_tools, SDS_transects
 
-
 @dataclass
 class SlopeOptions:
     save_figures: bool = True
     cache_dir_name: str = "slope_estimation"
-
 
 def run_slope_estimation(
     settings: Dict[str, Any],
@@ -32,23 +30,14 @@ def run_slope_estimation(
     fp_slopes = os.path.join(settings["inputs"]["filepath"], options.cache_dir_name)
     os.makedirs(fp_slopes, exist_ok=True)
 
-    # filtered_output = _filter_output(output)
-    filtered_output = output
-
-    # selected_indices = np.where(_get_no_S2_mask(output))[0]
-    # filtered_output = output[selected_indices]
-    # cross_distance = _compute_filtered_cross_distance(filtered_output, settings)
-
-    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, filtered_output)
+    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, output)
 
     (
         filtered_dates_sat,
         filtered_tides_sat,
         filtered_cross_distance,
         tide_stats,
-    ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance, filtered_output)
-
-
+    ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance, output)
 
     slope_est, cis = _estimate_slopes(
         fp_slopes,
@@ -59,44 +48,7 @@ def run_slope_estimation(
     )
 
     settings["tide_filter_stats"] = {**settings.get("tide_filter_stats", {}), **tide_stats}
-    return slope_est, dates_sat, tides_sat, filtered_output
-
-
-def _filter_output(output: Dict[str, Any]) -> Dict[str, Any]:
-    filtered = dict(output)
-    if "satname" in filtered and "S2" in filtered["satname"]:
-        idx_keep = np.array([sat != "S2" for sat in filtered["satname"]])
-        for key in filtered.keys():
-            filtered[key] = [filtered[key][i] for i in np.where(idx_keep)[0]]
-    filtered = SDS_tools.remove_duplicates(filtered)
-    filtered = SDS_tools.remove_inaccurate_georef(filtered, 12)
-    return filtered
-
-def _get_no_S2_mask(output: Dict[str, Any]) -> np.array:
-    return np.array([sat != 'S2' for sat in output['satname']], dtype=bool)
-
-
-def _compute_filtered_cross_distance(output: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
-    transects = SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"])
-    settings_transects = {
-        "along_dist": 50,
-        "min_points": 3,
-        "max_std": 15,
-        "max_range": 30,
-        "min_chainage": -100,
-        "multiple_inter": "max",
-        "auto_prc": 0.1,
-    }
-    cross_distance = SDS_transects.compute_intersection_QC(output, transects, settings_transects)
-
-    settings_outliers = {
-        "max_cross_change": 40,
-        "otsu_threshold": [-0.5, 0],
-        "plot_fig": False,
-    }
-
-    return SDS_transects.reject_outliers(cross_distance, output, settings_outliers)
-
+    return slope_est, dates_sat, tides_sat
 
 def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any]):
     handlers = pyfes.load_config(settings["inputs"]["fes_config"])
@@ -134,11 +86,32 @@ def _apply_tide_filters(
     cross_distance,
     output
 ):
-    settings_slope = settings.setdefault("slope_settings", {})
-    settings_slope["n_days"] = 8
-
-    # percentile filter
     tide_filter_cfg = settings.get("tide_filter")
+    tide_filter_mask, tide_thresholds = _get_percentile_tide_mask(tide_filter_cfg, tides_sat, tides_ts)
+
+    date_start = pytz.utc.localize(datetime(2020, 1, 1))
+    date_end = pytz.utc.localize(datetime(2025, 1, 1))
+    dates_mask = _get_dates_mask(date_start, date_end, dates_sat)
+
+    combined_mask = dates_mask & tide_filter_mask if tide_filter_cfg else dates_mask
+    combined_mask &= _get_no_S2_mask(output) # remove noisy S2 data
+    
+    selected_indices = np.where(combined_mask)[0]
+    if selected_indices.size == 0:
+        selected_indices = np.where(dates_mask)[0] if np.any(dates_mask) else np.arange(len(dates_sat))
+        print("No acquisition dates fall within the slope estimation window; removing tide filters or using all dates instead.")
+
+    # use combined_mask to filter data
+    settings.setdefault("tide_filter_stats", {})["used_for_slopes"] = int(selected_indices.size)
+    filtered_dates_sat = [dates_sat[i] for i in selected_indices]
+    filtered_tides_sat = tides_sat[selected_indices]
+    filtered_cross_distance = {
+        key: cross_distance[key][selected_indices] for key in cross_distance.keys()
+    }
+
+    return filtered_dates_sat, filtered_tides_sat, filtered_cross_distance, tide_thresholds
+
+def _get_percentile_tide_mask(tide_filter_cfg, tides_sat, tides_ts):
     tide_filter_mask = np.ones_like(tides_sat, dtype=bool)
     tide_thresholds = {}
     if tide_filter_cfg:
@@ -159,33 +132,17 @@ def _apply_tide_filters(
         total = int(tides_sat.size)
         tide_thresholds["removed_acquisitions"] = removed
         tide_thresholds["total_acquisitions"] = total
+    return tide_filter_mask, tide_thresholds
 
-    # get all dates in given range in utc time zone
-    date_start = pytz.utc.localize(datetime(2020, 1, 1))
-    date_end = pytz.utc.localize(datetime(2025, 1, 1))
+# get all dates in given range in utc time zone
+def _get_dates_mask(date_start, date_end, dates_sat):
     normalized_dates: list[datetime] = [
         _ensure_aware(raw_date) for raw_date in dates_sat
     ]
-    idx_dates = np.array(
+    return np.array(
         [date_start < aware < date_end for aware in normalized_dates],
         dtype=bool,
     )
-    combined_mask = idx_dates & tide_filter_mask if tide_filter_cfg else idx_dates
-    combined_mask &= _get_no_S2_mask(output) # remove noisy S2 data
-    selected_indices = np.where(combined_mask)[0]
-    if selected_indices.size == 0:
-        selected_indices = np.where(idx_dates)[0] if np.any(idx_dates) else np.arange(len(dates_sat))
-        print("No acquisition dates fall within the slope estimation window; removing tide filters or using all dates instead.")
-
-    settings.setdefault("tide_filter_stats", {})["used_for_slopes"] = int(selected_indices.size)
-    filtered_dates_sat = [dates_sat[i] for i in selected_indices]
-    filtered_tides_sat = tides_sat[selected_indices]
-    filtered_cross_distance = {
-        key: cross_distance[key][selected_indices] for key in cross_distance.keys()
-    }
-
-    return filtered_dates_sat, filtered_tides_sat, filtered_cross_distance, tide_thresholds
-
 
 def _ensure_aware(date):
     if not isinstance(date, datetime):
@@ -195,6 +152,8 @@ def _ensure_aware(date):
         return pytz.utc.localize(date)
     return date.astimezone(pytz.utc)
 
+def _get_no_S2_mask(output: Dict[str, Any]) -> np.array:
+    return np.array([sat != 'S2' for sat in output['satname']], dtype=bool)
 
 def _estimate_slopes(
     fp_slopes: str,
@@ -241,7 +200,6 @@ def _estimate_slopes(
 
     if freq_band is not None:
         settings_slope['freqs_max'] = freq_band
-
 
     slope_est, cis = {}, {}
     for key in filtered_cross_distance.keys():
