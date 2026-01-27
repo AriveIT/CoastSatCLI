@@ -4,29 +4,30 @@ from typing import Any, Dict, Tuple
 
 from coastsat import SDS_download, SDS_preprocess, SDS_tools
 
-DEFAULT_DATES = ["1984-01-01", "2025-01-01"]
-DEFAULT_SAT_LIST = ["L5", "L7", "L8", "L9"]
+
+# DEFAULT_DATES = ["1984-01-01", "2025-01-01"]
+# DEFAULT_SAT_LIST = ["L5", "L7", "L8", "L9"]
 
 
-def prepare_initial_settings(raw_config: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+def prepare_initial_settings(raw_config: Dict[str, Any], date_range, sat_list) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
     Build the CoastSat inputs/settings structures using the same logic as the legacy
     initial_settings function. Returns (inputs, settings, metadata).
     """
-    inputs = _build_inputs_dict(raw_config)
+    inputs = _build_inputs_dict(raw_config, date_range, sat_list)
     metadata = _retrieve_metadata(inputs)
     settings = _build_analysis_settings(raw_config, inputs)
     return inputs, settings, metadata
 
 
-def _build_inputs_dict(raw_config: Dict[str, Any]) -> Dict[str, Any]:
+def _build_inputs_dict(raw_config: Dict[str, Any], date_range, sat_list) -> Dict[str, Any]:
     inputs_section = raw_config["inputs"]
 
     polygon = SDS_tools.polygon_from_kml(inputs_section["aoi_path"])
     polygon = SDS_tools.smallest_rectangle(polygon)
 
-    dates = raw_config.get("dates", DEFAULT_DATES)
-    sat_list = raw_config.get("sat_list", DEFAULT_SAT_LIST)
+    dates = raw_config.get("dates", date_range)
+    sat_list = raw_config.get("sat_list", sat_list)
 
     return {
         "polygon": polygon,
@@ -49,7 +50,6 @@ def _build_analysis_settings(raw_config: Dict[str, Any], inputs: Dict[str, Any])
     settings = {
         "cloud_thresh": raw_config.get("cloud_thresh", 0.2),
         "dist_clouds": raw_config.get("dist_clouds", 50),
-        "output_epsg": raw_config["output_epsg"],
         "check_detection": raw_config.get("check_detection", False),
         "adjust_detection": raw_config.get("adjust_detection", False),
         "save_figure": raw_config.get("save_figure", True),
@@ -59,7 +59,9 @@ def _build_analysis_settings(raw_config: Dict[str, Any], inputs: Dict[str, Any])
         "sand_color": raw_config.get("sand_color", "default"),
         "pan_off": raw_config.get("pan_off", False),
         "s2cloudless_prob": raw_config.get("s2cloudless_prob", 20),
+        "max_dist_ref" : raw_config.get("max_dist_ref", 500),
         "inputs": inputs,
+        "output_epsg": raw_config["output_epsg"],
     }
 
     if raw_config.get("tide_filter"):
@@ -72,6 +74,6 @@ def _build_analysis_settings(raw_config: Dict[str, Any], inputs: Dict[str, Any])
         inputs["reference_geojson"],
         settings["output_epsg"],
     )
-    settings["max_dist_ref"] = raw_config.get("max_dist_ref", 500)
+    
 
     return settings

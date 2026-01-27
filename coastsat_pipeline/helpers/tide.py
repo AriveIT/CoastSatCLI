@@ -38,6 +38,7 @@ def apply_tide_correction(
     if tide_inputs.get("tide_csv_path"):
         return _apply_csv_tide_correction(output, cross_distance, settings, options)
 
+    # use FES-derived tides
     reference_elevation = options.reference_elevation
     cross_distance_tidally_corrected: Dict[str, np.ndarray] = {}
     for key in cross_distance.keys():

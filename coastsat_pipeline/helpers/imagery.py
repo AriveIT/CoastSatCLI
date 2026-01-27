@@ -22,7 +22,6 @@ class ImageryOptions:
     save_geojson: bool = True
     save_plots: bool = True
     cache_enabled: bool = True
-    max_dist_ref: float = 500.0
     skip_existing_jpg: bool = True
 
 
@@ -56,12 +55,6 @@ def run_batch_shoreline_detection(
         preprocessed_dir=preprocessed_dir,
         skip_dir=quality_skip_dir,
     )
-
-    settings["reference_shoreline"] = SDS_preprocess.get_reference_sl_from_geojson(
-        settings["inputs"]["reference_geojson"],
-        settings["output_epsg"],
-    )
-    settings["max_dist_ref"] = options.max_dist_ref
 
     output = run_detection(metadata, settings)
 
@@ -135,7 +128,7 @@ def load_cached_output(settings: Dict[str, Any], cache_enabled: bool = True) -> 
 
 
 def run_detection(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
-    output = SDS_shoreline.extract_shorelines(metadata, settings)
+    output = SDS_shoreline.extract_shorelines(metadata, settings) # this also saves <sitename>_output.pkl and shorelines.kml
     output = SDS_tools.remove_duplicates(output)
     output = SDS_tools.remove_inaccurate_georef(output, 10)
     return output
@@ -260,6 +253,7 @@ def _apply_quality_filter(
 ) -> Dict[str, Any]:
     satellites_cfg = (quality_config or {}).get("satellites") or {}
     if not satellites_cfg:
+        print("No satellite configuration in quality configuration")
         return metadata
     filtered: Dict[str, Any] = {}
     for satname, sat_meta in metadata.items():

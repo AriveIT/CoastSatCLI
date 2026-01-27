@@ -111,6 +111,8 @@ def _apply_tide_filters(
 
     return filtered_dates_sat, filtered_tides_sat, filtered_cross_distance, tide_thresholds
 
+# tides_ts (tide levels at each time step in the date range) is used to calculate more accurate percentiles
+# then, those percentiles are applied to tides_sat, which correspond to the acquisitions
 def _get_percentile_tide_mask(tide_filter_cfg, tides_sat, tides_ts):
     tide_filter_mask = np.ones_like(tides_sat, dtype=bool)
     tide_thresholds = {}
