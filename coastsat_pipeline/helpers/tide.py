@@ -10,12 +10,6 @@ import pandas as pd
 from coastsat import SDS_tools
 from ..parameters import TideOptions
 
-# @dataclass
-# class TideOptions:
-#     reference_elevation: float = 0.0
-#     write_csv: bool = True
-#     beach_slope: Optional[float] = None
-
 
 def apply_tide_correction(
     output: Dict[str, Any],

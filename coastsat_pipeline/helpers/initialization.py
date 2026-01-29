@@ -36,7 +36,6 @@ def _build_inputs_dict(raw_config: Dict[str, Any], download_filters) -> Dict[str
 
 
 def _retrieve_metadata(inputs: Dict[str, Any]) -> Dict[str, Any]:
-    print(f"{inputs = }")
     metadata = SDS_download.retrieve_images(inputs)
     return SDS_download.get_metadata(inputs)
 

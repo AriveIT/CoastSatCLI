@@ -17,13 +17,6 @@ import pandas as pd
 from coastsat import SDS_transects
 from ..parameters import PlottingOptions
 
-# @dataclass
-# class PlottingOptions:
-#     trend_min: float = -30.0
-#     trend_max: float = 30.0
-#     cmap_name: str = "RdBu_r"
-#     dpi: int = 300
-
 
 def render_transect_trend_plot(
     output: Dict[str, Any],

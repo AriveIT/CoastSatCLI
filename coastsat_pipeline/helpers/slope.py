@@ -16,10 +16,6 @@ from shapely.geometry import Polygon
 from coastsat import SDS_slope, SDS_tools, SDS_transects
 from ..parameters import SlopeOptions
 
-# @dataclass
-# class SlopeOptions:
-#     save_figures: bool = True
-#     cache_dir_name: str = "slope_estimation"
 
 def run_slope_estimation(
     settings: Dict[str, Any],
@@ -65,11 +61,6 @@ def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any], date_range:
     aoi_geom = Polygon(settings["inputs"]["polygon"][0])
     centroid = SDS_tools.select_valid_centroid(aoi_geom, ocean_tide, load_tide)
 
-    # date_range = [
-    #     pytz.utc.localize(datetime(2020, 1, 1)),
-    #     pytz.utc.localize(datetime(2025, 1, 1)),
-    # ]
-    # timestep = 900
     dates_ts, tides_ts = SDS_slope.compute_tide(centroid, date_range, timestep, ocean_tide, load_tide)
 
     dates_sat = output["dates"]
@@ -173,18 +164,6 @@ def _estimate_slopes(
     slope_settings,
     default_slope
 ):
-    # slope_settings = {
-    #     'slope_min': 0.005,
-    #     'slope_max': 0.4,
-    #     'delta_slope': 0.005,
-    #     'n0': 50,
-    #     'freq_cutoff': 1. / (24 * 3600 * 30),  # 30-day frequency
-    #     'delta_f': 100 * 1e-10,
-    #     'prc_conf': 0.05,
-    #     'plot_fig': save_figures,
-    #     'n_days': 8
-    # }
-
     # get range of beach slopes for power_spectrum
     beach_slopes = SDS_slope.range_slopes(slope_settings['slope_min'], slope_settings['slope_max'], slope_settings['delta_slope'])
 

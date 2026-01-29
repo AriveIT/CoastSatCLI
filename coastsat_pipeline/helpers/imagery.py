@@ -31,7 +31,7 @@ def run_batch_shoreline_detection(
 
     scene_metrics_manifest, scene_metrics_path = _load_scene_metrics(settings)
 
-    preprocess_images(metadata, settings, scene_metrics_manifest, scene_metrics_path)
+    preprocess_images(metadata, settings, options, scene_metrics_manifest, scene_metrics_path)
     cached_output = load_cached_output(settings, cache_enabled=options.cache_enabled)
     if cached_output is not None:
         return cached_output
@@ -61,12 +61,12 @@ def run_batch_shoreline_detection(
 def preprocess_images(
     metadata: Dict[str, Any],
     settings: Dict[str, Any],
+    imagery_opts: ImageryOptions,
     scene_metrics_manifest: Dict[str, Any] | None = None,
     scene_metrics_path: Path | None = None,
 ) -> None:
-    imagery_opts = settings.get("imagery_options", {})
-    skip_existing = imagery_opts.get("skip_existing_jpg", True)
-    capture_skipped = imagery_opts.get("capture_skipped_jpgs", False)
+    skip_existing = imagery_opts.skip_existing_jpg
+    capture_skipped = imagery_opts.capture_skipped_jpgs
     debug_dir = None
     if capture_skipped:
         debug_dir = str(Path(settings["inputs"]["filepath"]) / "jpg_files" / "skipped")
@@ -88,17 +88,17 @@ def preprocess_images(
         print(f"[Imagery] Converting {total_missing} new scenes to JPG.")
         metadata_to_process = _filter_metadata_by_indices(metadata, missing_indices)
 
-    ################################################################################################################# Commented for debugging
-    # SDS_preprocess.save_jpg(
-    #     metadata_to_process,
-    #     settings,
-    #     use_matplotlib=True,
-    #     debug_skipped_dir=debug_dir,
-    #     metrics_callback=metrics_buffer.append,
-    # )
+    if not imagery_opts.skip_jpg:
+        SDS_preprocess.save_jpg(
+            metadata_to_process,
+            settings,
+            use_matplotlib=True,
+            debug_skipped_dir=debug_dir,
+            metrics_callback=metrics_buffer.append,
+        )
     _update_jpg_manifest(manifest, metadata_to_process, manifest_path)
     _update_scene_metrics(scene_metrics, metrics_buffer, scene_metrics_file)
-    if imagery_opts.get("prompt_for_ideal_selection", False):
+    if imagery_opts.prompt_for_ideal_selection:
         maybe_select_ideal_scenes(
             site_dir=settings["inputs"]["filepath"],
             scene_metrics=scene_metrics,

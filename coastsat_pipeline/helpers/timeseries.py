@@ -14,13 +14,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# @dataclass
-# class TimeSeriesOptions:
-#     """Tuning switches for time-series post-processing outputs."""
-#     write_csv: bool = False # would overwrite file made earlier in pipeline...
-#     save_seasonal_plots: bool = True
-#     save_monthly_plots: bool = True
-#     outlier_settings: Dict[str, Any] | None = None
 
 @dataclass
 class TimeSeriesResult:
@@ -80,17 +73,6 @@ def _write_time_series_csv(transects, cross_distance, dates, settings):
     df = pd.DataFrame(out_dict)
     fn = os.path.join(settings["inputs"]["filepath"], "transect_time_series.csv")
     df.to_csv(fn, sep=",")
-
-
-def _despike_timeseries(cross_distance, output, settings, overrides):
-    """Apply outlier rejection with either custom overrides or defaults."""
-    default = {
-        "otsu_threshold": [-0.5, 0],
-        "max_cross_change": 50,
-        "plot_fig": False,
-    }
-    outlier_settings = overrides or default
-    return SDS_transects.reject_outliers(cross_distance, output, outlier_settings)
 
 
 def _plot_seasonal_average(key, dates, chainage, settings):

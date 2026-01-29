@@ -17,13 +17,6 @@ from ..parameters import AnalysisOptions
 logger = logging.getLogger(__name__)
 
 
-# @dataclass
-# class AnalysisOptions:
-#     plot_transects: bool = True
-#     plot_time_series: bool = True
-#     write_csv: bool = True
-
-
 def run_shoreline_analysis(
     output: Dict[str, Any],
     settings: Dict[str, Any],
@@ -83,25 +76,8 @@ def _compute_cross_distance(
         transect_settings: Dict[str, Any],
         outlier_settings: Dict[str, Any],
 ) -> Dict[str, Any]:
-    # settings_transects = {
-    #     "along_dist": 25,
-    #     "min_points": 3,
-    #     "max_std": 15,
-    #     "max_range": 30,
-    #     "min_chainage": -100,
-    #     "multiple_inter": "max",
-    #     "auto_prc": 0.1,
-    # }
     cross_distance = SDS_transects.compute_intersection_QC(output, transects, transect_settings)
-
-    # settings_outliers = {
-    #     "max_cross_change": 40,
-    #     "otsu_threshold": [-0.5, 0],
-    #     "plot_fig": False,
-    # }
-    cross_distance = SDS_transects.reject_outliers(cross_distance, output, outlier_settings)
-
-    return cross_distance
+    return SDS_transects.reject_outliers(cross_distance, output, outlier_settings)
 
 
 def _plot_time_series(output: Dict[str, Any], cross_distance: Dict[str, Any], settings: Dict[str, Any]) -> None:

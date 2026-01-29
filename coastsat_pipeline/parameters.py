@@ -12,7 +12,10 @@ class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = True # plots all extracted shorelines in different colours
     cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
-    skip_existing_jpg: bool = True # skip creating jpg that already exist
+    skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
+    capture_skipped_jpgs: bool = False # save skipped jpg for debugging
+    skip_jpg: bool = True # skip saving jpg altogether (intended for when rerunning site)
+    prompt_for_ideal_selection: bool = False
 
 @dataclass
 class AnalysisOptions:
