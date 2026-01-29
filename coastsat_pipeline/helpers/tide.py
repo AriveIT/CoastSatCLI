@@ -8,13 +8,13 @@ import numpy as np
 import pandas as pd
 
 from coastsat import SDS_tools
+from ..parameters import TideOptions
 
-
-@dataclass
-class TideOptions:
-    reference_elevation: float = 0.0
-    write_csv: bool = True
-    beach_slope: Optional[float] = None
+# @dataclass
+# class TideOptions:
+#     reference_elevation: float = 0.0
+#     write_csv: bool = True
+#     beach_slope: Optional[float] = None
 
 
 def apply_tide_correction(
@@ -25,6 +25,7 @@ def apply_tide_correction(
     slope_est: Dict[str, float],
     dates_sat,
     tides_sat,
+    default_slope,
     options: TideOptions | None = None,
 ) -> Dict[str, np.ndarray]:
     """
@@ -36,7 +37,7 @@ def apply_tide_correction(
     print(f"[Tide] Inputs mode: {'csv' if tide_inputs.get('tide_csv_path') else 'fes'}")
     print(f"[Tide] Transects: {len(transects)}, cross_distance keys: {len(cross_distance)}")
     if tide_inputs.get("tide_csv_path"):
-        return _apply_csv_tide_correction(output, cross_distance, settings, options)
+        return _apply_csv_tide_correction(output, cross_distance, settings, options, default_slope)
 
     # use FES-derived tides
     reference_elevation = options.reference_elevation
@@ -45,7 +46,7 @@ def apply_tide_correction(
         common_length = min(len(dates_sat), len(tides_sat), len(cross_distance[key]))
         truncated_tides = tides_sat[:common_length]
         truncated_cross = cross_distance[key][:common_length]
-        transect_slope = slope_est.get(key, 0.1) or 0.1
+        transect_slope = slope_est.get(key, default_slope) or default_slope
         correction = (truncated_tides - reference_elevation) / transect_slope
         cross_distance_tidally_corrected[key] = truncated_cross + correction
 
@@ -59,12 +60,13 @@ def _apply_csv_tide_correction(
     cross_distance: Dict[str, np.ndarray],
     settings: Dict[str, Any],
     options: TideOptions,
+    default_slope: float
 ) -> Dict[str, np.ndarray]:
     print("[Tide] Applying CSV-based tide correction.")
     tide_inputs = settings["inputs"]
     path = tide_inputs["tide_csv_path"]
     reference_elevation = tide_inputs.get("reference_elevation", options.reference_elevation)
-    beach_slope = tide_inputs.get("beach_slope") or options.beach_slope or 0.1
+    beach_slope = tide_inputs.get("beach_slope") or options.beach_slope or default_slope
     tide_data = pd.read_csv(path)
     if "dates" not in tide_data.columns or "tide" not in tide_data.columns:
         raise ValueError("Tide CSV must contain 'dates' and 'tide' columns")

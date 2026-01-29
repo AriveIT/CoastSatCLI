@@ -5,6 +5,7 @@ from typing import Iterable, List, Optional
 
 from .context import PipelineContext
 from .stage import PipelineStage
+from .parameters import Parameters
 
 from . import checkpoints
 
@@ -25,6 +26,7 @@ class PipelineRunner:
         self.stages: List[PipelineStage] = list(stages)
 
     def run(self, context: PipelineContext) -> None:
+        params = Parameters()
         total_stages = len(self.stages)
         if total_stages == 0:
             print("PROGRESS: 100%")
@@ -38,7 +40,7 @@ class PipelineRunner:
                 checkpoints.save_context(context, stage.name)
                 print(f"RUNNING: {stage.name}")
                 stage.log_start()
-                stage.run(context)
+                stage.run(context, params)
                 stage.log_end()
                 ran = True
 

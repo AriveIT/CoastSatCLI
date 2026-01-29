@@ -5,13 +5,14 @@ from typing import Any, Dict
 from ..context import PipelineContext
 from ..helpers.imagery import run_batch_shoreline_detection
 from ..stage import PipelineStage
+from ..parameters import Parameters
 
 
 class ImageryStage(PipelineStage):
     name = "imagery"
     description = "Download/preprocess imagery and run shoreline detection."
 
-    def run(self, context: PipelineContext) -> None:
+    def run(self, context: PipelineContext, params: Parameters) -> None:
         inputs = context.inputs_config
         settings = context.analysis_settings
         metadata = context.metadata.get("initialization") if context.metadata else None

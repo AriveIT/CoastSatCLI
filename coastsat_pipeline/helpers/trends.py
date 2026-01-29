@@ -48,6 +48,7 @@ def compute_and_save_trends(
     settings: Dict[str, Any],
     slope_est: Dict[str, float],
     trend_dict: Dict[str, float],
+    default_slope: float
 ) -> TrendExportResult:
     """
     Build per-transect trend summaries and export them as GeoJSON, mirroring the legacy Stage 08.
@@ -60,6 +61,7 @@ def compute_and_save_trends(
         settings=settings,
         slope_est=slope_est,
         trend_dict=trend_dict,
+        default_slope=default_slope
     )
     geojson_path = _export_trends_geojson(records, settings)
 
@@ -74,6 +76,7 @@ def _build_transect_trends(
     settings: Dict[str, Any],
     slope_est: Dict[str, float],
     trend_dict: Dict[str, float],
+    default_slope: float,
 ) -> List[TransectTrend]:
     total_images = len(output.get("dates", []))
     tide_stats = settings.get("tide_filter_stats", {})
@@ -99,7 +102,7 @@ def _build_transect_trends(
             id=key,
             geometry=MultiLineString([geometry]),
             trend=trend_dict.get(key, np.nan),
-            slope=slope_est.get(key, 0.1),
+            slope=slope_est.get(key, default_slope),
             images_total=int(total_images),
             images_used=n_used,
             coverage_pct=coverage_pct,

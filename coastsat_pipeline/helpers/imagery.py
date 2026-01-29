@@ -15,14 +15,7 @@ from coastsat import SDS_preprocess, SDS_shoreline, SDS_tools
 import shutil
 
 from .imagery_quality import maybe_select_ideal_scenes, load_quality_config
-
-
-@dataclass
-class ImageryOptions:
-    save_geojson: bool = True
-    save_plots: bool = True
-    cache_enabled: bool = True
-    skip_existing_jpg: bool = True
+from ..parameters import ImageryOptions
 
 
 def run_batch_shoreline_detection(

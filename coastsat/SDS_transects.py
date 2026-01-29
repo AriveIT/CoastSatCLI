@@ -273,6 +273,7 @@ def compute_intersection_QC(output, transects, settings):
                     accepted, beyond this point a NaN is returned
                 'multiple_inter': mode for removing outliers ('auto', 'nan', 'max')
                 'auto_prc': percentage to use in 'auto' mode to switch from 'nan' to 'max'
+                'd_origin_threshold': distance a shoreline points can be from transect origin and be counted as an intersection
                         
     Returns:    
     -----------
@@ -320,7 +321,7 @@ def compute_intersection_QC(output, transects, settings):
             d_origin = np.linalg.norm(sl - p1, axis=1)
             # find the shoreline points that are close to the transects and to the origin
             # the distance to the origin is hard-coded here to 1 km 
-            idx_dist = np.logical_and(d_line <= along_dist, d_origin <= 200)
+            idx_dist = np.logical_and(d_line <= along_dist, d_origin <= settings['d_origin_threshold'])
             idx_close = np.where(idx_dist)[0]
             
             # in case there are no shoreline points close to the transect 
@@ -375,6 +376,12 @@ def compute_intersection_QC(output, transects, settings):
         elif settings['multiple_inter'] == 'nan':
             med_intersect[~idx_good] = np.nan
             prc_over = 0
+
+        elif settings['multiple_inter'] == 'min':
+            med_intersect[~idx_good] = min_intersect[~idx_good]
+            med_intersect[~condition3] = np.nan
+            prc_over = 0
+
         
         else:
             raise Exception('the multiple_inter parameter can only be: nan, max or auto')

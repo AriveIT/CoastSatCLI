@@ -5,14 +5,14 @@ import logging
 from ..context import PipelineContext
 from ..stage import PipelineStage
 from ..helpers.trends import compute_and_save_trends
-
+from ..parameters import Parameters
 
 class TrendCalculationStage(PipelineStage):
     name = "trends"
     description = "Compute trends and export final outputs."
     logger = logging.getLogger(__name__)
 
-    def run(self, context: PipelineContext) -> None:
+    def run(self, context: PipelineContext, params: Parameters) -> None:
         transects = context.transects
         processed = context.cross_distance_processed or context.cross_distance_tidally_corrected
         output = context.shoreline_output
@@ -31,6 +31,7 @@ class TrendCalculationStage(PipelineStage):
             settings=settings,
             slope_est=slope_est,
             trend_dict=trend_dict,
+            default_slope=params.default_slope
         )
 
         context.trend_results = trend_results

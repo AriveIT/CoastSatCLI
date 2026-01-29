@@ -1,8 +1,9 @@
 """
-NOTE: the coastsat pipeline often uses files that were made previously in the pipeline (jpgs for example)
-If those files do not exist, this checkpoint system will not work
+NOTE: the coastsat pipeline may  use files or parameters that were made previously in the pipeline
+If they do not exist, this checkpoint system will not work
 Therefore, recommended usage is to use checkpoints that you have created from your own runs, to guarantee
 that those previous files have been created.
+If playing with parameters, make sure to run from a checkpoint from before those parameters are enacted
 
 NOTE: always assumes pkl files are in checkpoints directory (this is where they get saved to and loaded from by checkpoints.py)
 
@@ -26,19 +27,12 @@ def run_from_cp(target_stage_name) -> None:
     runner = PipelineRunner(stages_to_run)
     runner.run(context)
 
-# runs pipeline starting at stage associated with context pkl file with the most recent
-# last modified date
+# finds stage associated with context pkl file with the most recent
+# last modified date and runs from that checkpoint
 def run_from_last_cp():
     context_file_name = _get_last_cp()
     target_stage_name = get_stage_name_from_file_name(context_file_name)
-    context = load_context(target_stage_name)
-
-    stages_to_run = _get_stages_to_run(target_stage_name)
-
-    # run remainder of pipeline, starting at target stage
-    print(f"Running from stage: {target_stage_name}")
-    runner = PipelineRunner(stages_to_run)
-    runner.run(context)
+    run_from_cp(target_stage_name)
 
 # gets checkpoint with most recent modification time
 def _get_last_cp():

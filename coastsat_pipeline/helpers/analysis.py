@@ -12,20 +12,24 @@ import pandas as pd
 from matplotlib import gridspec
 
 from coastsat import SDS_tools, SDS_transects
+from ..parameters import AnalysisOptions
 
 logger = logging.getLogger(__name__)
 
 
-@dataclass
-class AnalysisOptions:
-    plot_transects: bool = True
-    plot_time_series: bool = True
-    write_csv: bool = True
+# @dataclass
+# class AnalysisOptions:
+#     plot_transects: bool = True
+#     plot_time_series: bool = True
+#     write_csv: bool = True
 
 
 def run_shoreline_analysis(
     output: Dict[str, Any],
     settings: Dict[str, Any],
+    transect_settings: Dict[str, Any],
+    outlier_settings: Dict[str, Any],
+    georef_accuracy_tolerance: float,
     options: AnalysisOptions | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
@@ -37,14 +41,14 @@ def run_shoreline_analysis(
     logger.info("Stage 03: analyzing shorelines for site %s", sitename)
 
     output = SDS_tools.remove_duplicates(output)
-    output = SDS_tools.remove_inaccurate_georef(output, 10)
+    output = SDS_tools.remove_inaccurate_georef(output, georef_accuracy_tolerance)
 
     transects = SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"])
 
     if settings.get("save_figure", False) and options.plot_transects:
         _plot_shorelines_with_transects(output, transects, settings)
 
-    cross_distance = _compute_cross_distance(output, transects)
+    cross_distance = _compute_cross_distance(output, transects, transect_settings, outlier_settings)
 
     if settings.get("save_figure", False) and options.plot_time_series:
         _plot_time_series(output, cross_distance, settings)
@@ -73,24 +77,29 @@ def _plot_shorelines_with_transects(output: Dict[str, Any], transects: Dict[str,
     plt.close(fig)
 
 
-def _compute_cross_distance(output: Dict[str, Any], transects: Dict[str, Any]) -> Dict[str, Any]:
-    settings_transects = {
-        "along_dist": 25,
-        "min_points": 3,
-        "max_std": 15,
-        "max_range": 30,
-        "min_chainage": -100,
-        "multiple_inter": "max",
-        "auto_prc": 0.1,
-    }
-    cross_distance = SDS_transects.compute_intersection_QC(output, transects, settings_transects)
+def _compute_cross_distance(
+        output: Dict[str, Any],
+        transects: Dict[str, Any],
+        transect_settings: Dict[str, Any],
+        outlier_settings: Dict[str, Any],
+) -> Dict[str, Any]:
+    # settings_transects = {
+    #     "along_dist": 25,
+    #     "min_points": 3,
+    #     "max_std": 15,
+    #     "max_range": 30,
+    #     "min_chainage": -100,
+    #     "multiple_inter": "max",
+    #     "auto_prc": 0.1,
+    # }
+    cross_distance = SDS_transects.compute_intersection_QC(output, transects, transect_settings)
 
-    settings_outliers = {
-        "max_cross_change": 40,
-        "otsu_threshold": [-0.5, 0],
-        "plot_fig": False,
-    }
-    cross_distance = SDS_transects.reject_outliers(cross_distance, output, settings_outliers)
+    # settings_outliers = {
+    #     "max_cross_change": 40,
+    #     "otsu_threshold": [-0.5, 0],
+    #     "plot_fig": False,
+    # }
+    cross_distance = SDS_transects.reject_outliers(cross_distance, output, outlier_settings)
 
     return cross_distance
 

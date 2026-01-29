@@ -9,17 +9,18 @@ import numpy as np
 import pandas as pd
 
 from coastsat import SDS_transects
+from ..parameters import TimeSeriesOptions
 import logging
 
 logger = logging.getLogger(__name__)
 
-@dataclass
-class TimeSeriesOptions:
-    """Tuning switches for time-series post-processing outputs."""
-    write_csv: bool = False # would overwrite file made earlier in pipeline...
-    save_seasonal_plots: bool = True
-    save_monthly_plots: bool = True
-    outlier_settings: Dict[str, Any] | None = None
+# @dataclass
+# class TimeSeriesOptions:
+#     """Tuning switches for time-series post-processing outputs."""
+#     write_csv: bool = False # would overwrite file made earlier in pipeline...
+#     save_seasonal_plots: bool = True
+#     save_monthly_plots: bool = True
+#     outlier_settings: Dict[str, Any] | None = None
 
 @dataclass
 class TimeSeriesResult:

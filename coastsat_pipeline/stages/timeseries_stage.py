@@ -3,13 +3,13 @@ from __future__ import annotations
 from ..context import PipelineContext
 from ..helpers.timeseries import run_time_series_post_processing
 from ..stage import PipelineStage
-
+from ..parameters import Parameters
 
 class TimeSeriesPostProcessingStage(PipelineStage):
     name = "timeseries_post"
     description = "Clean tide-corrected time series and prepare trend dict."
 
-    def run(self, context: PipelineContext) -> None:
+    def run(self, context: PipelineContext, params: Parameters) -> None:
         transects = context.transects
         settings = context.analysis_settings
         corrected = context.cross_distance_tidally_corrected

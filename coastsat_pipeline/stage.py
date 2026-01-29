@@ -4,6 +4,7 @@ import logging
 from abc import ABC, abstractmethod
 
 from .context import PipelineContext
+from .parameters import Parameters
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class PipelineStage(ABC):
         return True
 
     @abstractmethod
-    def run(self, context: PipelineContext) -> None:
+    def run(self, context: PipelineContext, params: Parameters) -> None:
         ...
 
     def log_start(self) -> None:

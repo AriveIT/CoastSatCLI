@@ -14,23 +14,28 @@ import pyfes
 from shapely.geometry import Polygon
 
 from coastsat import SDS_slope, SDS_tools, SDS_transects
+from ..parameters import SlopeOptions
 
-@dataclass
-class SlopeOptions:
-    save_figures: bool = True
-    cache_dir_name: str = "slope_estimation"
+# @dataclass
+# class SlopeOptions:
+#     save_figures: bool = True
+#     cache_dir_name: str = "slope_estimation"
 
 def run_slope_estimation(
     settings: Dict[str, Any],
     cross_distance: Dict[str, Any],
     output: Dict[str, Any],
+    date_range: list,
+    tide_timestep: float,
+    slope_settings: Dict[str, Any],
+    default_slope: float,
     options: SlopeOptions | None = None,
 ) -> Tuple[Dict[str, float], list[Any], np.ndarray]:
     options = options or SlopeOptions()
     fp_slopes = os.path.join(settings["inputs"]["filepath"], options.cache_dir_name)
     os.makedirs(fp_slopes, exist_ok=True)
 
-    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, output)
+    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, output, date_range, tide_timestep)
 
     (
         filtered_dates_sat,
@@ -45,12 +50,14 @@ def run_slope_estimation(
         filtered_tides_sat,
         filtered_cross_distance,
         options.save_figures,
+        slope_settings,
+        default_slope
     )
 
     settings["tide_filter_stats"] = {**settings.get("tide_filter_stats", {}), **tide_stats}
     return slope_est, dates_sat, tides_sat
 
-def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any]):
+def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any], date_range: list, timestep: float):
     handlers = pyfes.load_config(settings["inputs"]["fes_config"])
     ocean_tide = handlers["tide"]
     load_tide = handlers["radial"]
@@ -58,11 +65,11 @@ def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any]):
     aoi_geom = Polygon(settings["inputs"]["polygon"][0])
     centroid = SDS_tools.select_valid_centroid(aoi_geom, ocean_tide, load_tide)
 
-    date_range = [
-        pytz.utc.localize(datetime(2020, 1, 1)),
-        pytz.utc.localize(datetime(2025, 1, 1)),
-    ]
-    timestep = 900
+    # date_range = [
+    #     pytz.utc.localize(datetime(2020, 1, 1)),
+    #     pytz.utc.localize(datetime(2025, 1, 1)),
+    # ]
+    # timestep = 900
     dates_ts, tides_ts = SDS_slope.compute_tide(centroid, date_range, timestep, ocean_tide, load_tide)
 
     dates_sat = output["dates"]
@@ -163,21 +170,23 @@ def _estimate_slopes(
     filtered_tides_sat,
     filtered_cross_distance,
     save_figures: bool,
+    slope_settings,
+    default_slope
 ):
-    settings_slope = {
-        'slope_min': 0.005,
-        'slope_max': 0.4,
-        'delta_slope': 0.005,
-        'n0': 50,
-        'freq_cutoff': 1. / (24 * 3600 * 30),  # 30-day frequency
-        'delta_f': 100 * 1e-10,
-        'prc_conf': 0.05,
-        'plot_fig': save_figures,
-        'n_days': 8
-    }
+    # slope_settings = {
+    #     'slope_min': 0.005,
+    #     'slope_max': 0.4,
+    #     'delta_slope': 0.005,
+    #     'n0': 50,
+    #     'freq_cutoff': 1. / (24 * 3600 * 30),  # 30-day frequency
+    #     'delta_f': 100 * 1e-10,
+    #     'prc_conf': 0.05,
+    #     'plot_fig': save_figures,
+    #     'n_days': 8
+    # }
 
     # get range of beach slopes for power_spectrum
-    beach_slopes = SDS_slope.range_slopes(settings_slope['slope_min'], settings_slope['slope_max'], settings_slope['delta_slope'])
+    beach_slopes = SDS_slope.range_slopes(slope_settings['slope_min'], slope_settings['slope_max'], slope_settings['delta_slope'])
 
     if len(filtered_dates_sat) > 1:
         try:
@@ -190,7 +199,7 @@ def _estimate_slopes(
             plt.close(fig)
 
         try:
-            freq_band = SDS_slope.find_tide_peak(filtered_dates_sat, filtered_tides_sat, settings_slope)
+            freq_band = SDS_slope.find_tide_peak(filtered_dates_sat, filtered_tides_sat, slope_settings)
         except Exception as exc:
             print(f"Warning: unable to compute tidal frequency band after filtering: {exc}")
         else:
@@ -201,7 +210,7 @@ def _estimate_slopes(
         print("Not enough acquisition dates to characterize timestep distribution after filtering.")
 
     if freq_band is not None:
-        settings_slope['freqs_max'] = freq_band
+        slope_settings['freqs_max'] = freq_band
 
     slope_est, cis = {}, {}
     for key in filtered_cross_distance.keys():
@@ -214,20 +223,20 @@ def _estimate_slopes(
             tsall = SDS_slope.tide_correct(composite, tide, beach_slopes)
             if len(dates) == 0 or len(tsall) == 0:
                 print(f"Skipping transect {key} due to empty data.")
-                print(f"Setting default slope for {key} to 0.1 due to error.")
-                slope_est[key], cis[key] = 0.1, (0.1, 0.1)
+                print(f"Setting default slope for {key} to {default_slope} due to error.")
+                slope_est[key], cis[key] = default_slope, (default_slope, default_slope)
                 continue
             
-            slope_est[key], cis[key] = SDS_slope.integrate_power_spectrum(dates, tsall, settings_slope, key)
+            slope_est[key], cis[key] = SDS_slope.integrate_power_spectrum(dates, tsall, slope_settings, key)
             if save_figures:
                 plt.gcf().savefig(os.path.join(fp_slopes, f"2_energy_curve_{key}.jpg"), dpi=200)
                 plt.close()
-                SDS_slope.plot_spectrum_all(dates, composite, tsall, settings_slope, slope_est[key])
+                SDS_slope.plot_spectrum_all(dates, composite, tsall, slope_settings, slope_est[key])
                 plt.gcf().savefig(os.path.join(fp_slopes, f"3_slope_spectrum_{key}.jpg"), dpi=200)
                 plt.close()
             print(f"  → {key}: Estimated slope = {slope_est[key]:.3f} m (CI: {cis[key][0]:.4f} – {cis[key][1]:.4f})")
         except Exception as e:
             print(f'Error processing {key}: {e}')
-            print(f"Setting default slope for {key} to 0.1 due to error.")
-            slope_est[key], cis[key] = 0.1, (0.1, 0.1)
+            print(f"Setting default slope for {key} to {default_slope} due to error.")
+            slope_est[key], cis[key] = default_slope, (default_slope, default_slope)
     return slope_est, cis
