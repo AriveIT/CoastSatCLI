@@ -39,6 +39,10 @@ def run_shoreline_analysis(
     options = options or AnalysisOptions()
     sitename = settings.get("inputs", {}).get("sitename", "unknown")
     logger.info("Stage 03: analyzing shorelines for site %s", sitename)
+    
+    for key in settings.keys():
+        if key not in ["reference_shoreline"]:
+            print(f"settings[{key}] = {settings[key]}")
 
     output = SDS_tools.remove_duplicates(output)
     output = SDS_tools.remove_inaccurate_georef(output, georef_accuracy_tolerance)
@@ -92,6 +96,8 @@ def _compute_cross_distance(
     #     "multiple_inter": "max",
     #     "auto_prc": 0.1,
     # }
+    print(f"{transect_settings = }")
+    print(f"{outlier_settings = }")
     cross_distance = SDS_transects.compute_intersection_QC(output, transects, transect_settings)
 
     # settings_outliers = {
