@@ -72,35 +72,37 @@ class Parameters:
         "adjust_detection": False, # lets user adjust the detected shorelines with a slide bar.
         "save_figure": True, # this has to be true for ANY figures to be saved
         "min_beach_area": 500, # minimum number of pixels that have to be connected to belong to the SAND class
-        "min_length_sl": 250, # minimum length of shoreline perimeter to be kept (in meters)
+        "min_length_sl": 200, # minimum length of shoreline perimeter to be kept (in meters)
         "cloud_mask_issue": False, # switch this parameter to True if sand pixels are masked (in black) on many images
         "sand_color": "default", # classification model: 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
         "pan_off": False, # True to switch pansharpening off for Landsat 7/8/9 imagery
         "s2cloudless_prob": 20, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
-        "max_dist_ref" : 500, # maximum distance from the reference shoreline in meters
+        "max_dist_ref" : 200, # maximum distance from the reference shoreline in meters
     }
 
     #####################
     # Analysis
     #####################
     transect_settings = {
-        "along_dist": 25, # how far a point can be orthogonally to transect line
-        "d_origin_threshold": 200, # distance a shoreline points can be from transect origin and be counted as an intersection
-        "min_points": 3, # minimum number of points to calculate an intersections
-        "max_std": 15, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
-        "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
-        "min_chainage": -100, # furthest landward of the transect origin that an intersection is accepted
+        "along_dist": 35, # how far a point can be orthogonally to transect line
+        "past_dist": 300, # distance a shoreline points can be past end of transect and be counted as an intersection
+        "min_points": 4, # minimum number of points to calculate an intersections
+        "max_std": 20, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
+        "max_range": 20, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
+        "min_chainage": -50, # furthest landward of the transect origin that an intersection is accepted
         
         # method of dealing with transect/shorelines with large dispersion ('auto', 'nan', 'max')
         # nan = set values to nan
         # max = use maximum intersection
         # auto = if more than auto_prc% of intersections for a given transect (across shorelines) have std>max_std, use maximum intersection
-        "multiple_inter": "max",
+        # min = take the shore_prc th percentile
+        "multiple_inter": "min",
 
         # percentage to use in 'auto' mode to blend between 'nan' and 'max'
         # auto_prc = 0.0 --> max
         # auto_prc = 1.0 --> nan
-        "auto_prc": 0.1, 
+        "auto_prc": 0.05,
+        'min_prc': 15, # what percentile to take in "min" 
     }
 
     outlier_settings = {

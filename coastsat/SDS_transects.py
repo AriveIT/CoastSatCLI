@@ -290,7 +290,7 @@ def compute_intersection_QC(output, transects, settings):
     along_dist = settings['along_dist']
 
     # loop through each transect
-    n = len(transects.keys()) - 1
+    n = len(transects.keys())
     for key in transects.keys():
         print(f'\rProcessing {key} out of {str(n)}...', end='')
         
@@ -299,6 +299,7 @@ def compute_intersection_QC(output, transects, settings):
         med_intersect = np.zeros(len(shorelines))
         max_intersect = np.zeros(len(shorelines))
         min_intersect = np.zeros(len(shorelines))
+        prc_intersect = np.zeros(len(shorelines))
         n_intersect = np.zeros(len(shorelines))
         
         # loop through each shoreline
@@ -321,7 +322,8 @@ def compute_intersection_QC(output, transects, settings):
             d_origin = np.linalg.norm(sl - p1, axis=1)
             # find the shoreline points that are close to the transects and to the origin
             # the distance to the origin is hard-coded here to 1 km 
-            idx_dist = np.logical_and(d_line <= along_dist, d_origin <= settings['d_origin_threshold'])
+            search_limit = np.linalg.norm(transects[key][-1,:] - transects[key][0,:]) + settings['past_dist']
+            idx_dist = np.logical_and(d_line <= along_dist, d_origin <= search_limit)
             idx_close = np.where(idx_dist)[0]
             
             # in case there are no shoreline points close to the transect 
@@ -330,6 +332,7 @@ def compute_intersection_QC(output, transects, settings):
                 med_intersect[i] = np.nan
                 max_intersect[i] = np.nan
                 min_intersect[i] = np.nan
+                prc_intersect[i] = np.nan
                 n_intersect[i] = np.nan
             else:
                 # change of base to shore-normal coordinate system
@@ -344,6 +347,7 @@ def compute_intersection_QC(output, transects, settings):
                 med_intersect[i] = np.nanmedian(xy_rot[0,:])
                 max_intersect[i] = np.nanmax(xy_rot[0,:])
                 min_intersect[i] = np.nanmin(xy_rot[0,:])
+                prc_intersect[i] = np.nanpercentile(xy_rot[0,:], settings['min_prc'])
                 n_intersect[i] = np.sum(~np.isnan(xy_rot[0, :]))  # count only non-nan values
                 
         # quality control the intersections using dispersion metrics (std and range)
@@ -378,7 +382,7 @@ def compute_intersection_QC(output, transects, settings):
             prc_over = 0
 
         elif settings['multiple_inter'] == 'min':
-            med_intersect[~idx_good] = min_intersect[~idx_good]
+            med_intersect[~idx_good] = prc_intersect[~idx_good]
             med_intersect[~condition3] = np.nan
             prc_over = 0
 
@@ -436,9 +440,10 @@ def reject_outliers(cross_distance, output, settings):
     print("Cleaning time series data (removing outliers)...")
     
     for i,key in enumerate(list(cross_distance.keys())):
-        
         chainage = cross_distance[key].copy()
         if sum(np.isnan(chainage)) == len(chainage):
+            print('→ %s: has no intersections')
+            chain_dict[key] = chainage
             continue
 
         # 1. Remove nans and negative chainages
@@ -462,7 +467,6 @@ def reject_outliers(cross_distance, output, settings):
         chainage3, dates3 = identify_outliers(chainage2, dates2, settings['max_cross_change'])
         if len(chainage3) < 30:
             print(f"Warning: {key} has only {len(chainage3)} valid intersections, results may be untrustworthy")
-
 
         # fill with nans the indices to be removed from cross_distance
         idx_kept = []

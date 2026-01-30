@@ -42,6 +42,7 @@ def run_time_series_post_processing(
     processed, skipped = 0, 0
 
     for key in cross_distance.keys():
+        print(f'\rProcessing and plotting {key}...', end='')
         series = cross_distance[key]
         idx_valid = ~np.isnan(series)
         valid_dates = np.array(dates)[idx_valid]
@@ -50,18 +51,21 @@ def run_time_series_post_processing(
         if valid_chainage.size > 1:
             trend, fitted = SDS_transects.calculate_trend(valid_dates, valid_chainage)
             processed += 1
+
+            if settings.get("save_figure", False) and options.save_seasonal_plots:
+                _plot_seasonal_average(key, valid_dates, valid_chainage, settings)
+            if settings.get("save_figure", False) and options.save_monthly_plots:
+                _plot_monthly_average(key, valid_dates, valid_chainage, settings)
+
         else:
             trend = np.nan
             fitted = []
             skipped += 1
         trend_dict[key] = trend
 
-        if settings.get("save_figure", False) and options.save_seasonal_plots:
-            _plot_seasonal_average(key, valid_dates, valid_chainage, settings)
-        if settings.get("save_figure", False) and options.save_monthly_plots:
-            _plot_monthly_average(key, valid_dates, valid_chainage, settings)
 
     logger.info("Stage 07: processed %d transects (skipped %d due to insufficient data)", processed, skipped)
+    print(f"\nProcessed {processed} transects (skipped {skipped} due to insufficient data)")
     return TimeSeriesResult(cross_distance=cross_distance, trend_dict=trend_dict, processed_transects=processed, skipped_transects=skipped)
 
 

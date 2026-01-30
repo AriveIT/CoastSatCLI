@@ -47,6 +47,7 @@ class PipelineRunner:
             pct = int(((idx + 1) / total_stages) * 100)
             print(f"STAGE: {stage.name} ({'done' if ran else 'skipped'})")
             print(f"PROGRESS: {pct}%")
+        print(f"Completed analysis for site: {context.settings.inputs.sitename}")
 
 
 def run_pipeline(context: PipelineContext, stages: Iterable[PipelineStage]) -> PipelineContext:
