@@ -14,7 +14,7 @@ class ImageryOptions:
     cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = True # skip saving jpg altogether (intended for when rerunning site)
+    skip_jpg: bool = False # skip saving jpg altogether (intended for when rerunning site)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
@@ -51,7 +51,7 @@ class TimeSeriesOptions:
 
 @dataclass
 class Parameters:
-    apply_tide_correcion = False # False means skip slope estimation and tide correction
+    apply_tide_correcion = True # False means skip slope estimation and tide correction
 
     #####################
     # Initialization
