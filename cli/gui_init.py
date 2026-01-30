@@ -235,6 +235,9 @@ def main() -> None:
         print(f"Failed to read shoreline: {exc}")
         return
 
+    if args.tide_method == "fes" and not args.fes_config:
+        raise ValueError("Tide method FES is selected. Please select a FES config file")
+
     if args.mode == "single":
         if not args.aoi:
             print("Please select an AOI file for single mode.")
