@@ -51,6 +51,8 @@ class TimeSeriesOptions:
 
 @dataclass
 class Parameters:
+    apply_tide_correcion = False # False means skip slope estimation and tide correction
+
     #####################
     # Initialization
     #####################
@@ -140,5 +142,5 @@ class Parameters:
         'n_days': 8
     }
 
-    # this is also used in tide.py and trends.py
+    # this is also used in tide.py
     default_slope = 0.1 # default slope used when error occurs in slope estimation

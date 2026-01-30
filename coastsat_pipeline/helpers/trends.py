@@ -48,20 +48,18 @@ def compute_and_save_trends(
     settings: Dict[str, Any],
     slope_est: Dict[str, float],
     trend_dict: Dict[str, float],
-    default_slope: float
 ) -> TrendExportResult:
     """
     Build per-transect trend summaries and export them as GeoJSON, mirroring the legacy Stage 08.
     """
-
+    if not slope_est: slope_est = {}
     records = _build_transect_trends(
         transects=transects,
         cross_distance_tidally_corrected=cross_distance_tidally_corrected,
         output=output,
         settings=settings,
-        slope_est=slope_est,
         trend_dict=trend_dict,
-        default_slope=default_slope
+        slope_est=slope_est,
     )
     geojson_path = _export_trends_geojson(records, settings)
 
@@ -74,9 +72,8 @@ def _build_transect_trends(
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],
     settings: Dict[str, Any],
-    slope_est: Dict[str, float],
     trend_dict: Dict[str, float],
-    default_slope: float,
+    slope_est: Dict[str, float],
 ) -> List[TransectTrend]:
     total_images = len(output.get("dates", []))
     tide_stats = settings.get("tide_filter_stats", {})
@@ -102,7 +99,7 @@ def _build_transect_trends(
             id=key,
             geometry=MultiLineString([geometry]),
             trend=trend_dict.get(key, np.nan),
-            slope=slope_est.get(key, default_slope),
+            slope=slope_est.get(key, None),
             images_total=int(total_images),
             images_used=n_used,
             coverage_pct=coverage_pct,

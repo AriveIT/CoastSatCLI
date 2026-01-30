@@ -12,8 +12,9 @@ class TimeSeriesPostProcessingStage(PipelineStage):
     def run(self, context: PipelineContext, params: Parameters) -> None:
         transects = context.transects
         settings = context.analysis_settings
-        corrected = context.cross_distance_tidally_corrected
         output = context.shoreline_output
+
+        corrected = context.cross_distance_tidally_corrected or context.cross_distance
 
         if None in (transects, settings, corrected, output):
             raise RuntimeError("TimeSeriesPostProcessingStage missing required context data.")

@@ -22,7 +22,7 @@ class PipelineStage(ABC):
     name: str = "stage"
     description: str = ""
 
-    def should_run(self, context: PipelineContext) -> bool:
+    def should_run(self, context: PipelineContext, params:Parameters) -> bool:
         return True
 
     @abstractmethod

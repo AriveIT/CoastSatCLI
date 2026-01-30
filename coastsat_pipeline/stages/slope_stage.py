@@ -31,3 +31,7 @@ class SlopeEstimationStage(PipelineStage):
         context.slope_est = slope_est
         context.dates_sat = dates_sat
         context.tides_sat = tides_sat
+
+    def should_run(self, context: PipelineContext, params: Parameters) -> bool:
+        return params.apply_tide_correcion
+

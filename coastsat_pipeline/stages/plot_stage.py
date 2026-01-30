@@ -12,7 +12,7 @@ class ImprovedTransectsPlotStage(PipelineStage):
     def run(self, context: PipelineContext, params: Parameters) -> None:
         output = context.shoreline_output
         transects = context.transects
-        corrected = context.cross_distance_tidally_corrected
+        corrected = context.cross_distance_tidally_corrected or context.cross_distance
         settings = context.analysis_settings
 
         if None in (output, transects, corrected, settings):

@@ -442,7 +442,7 @@ def reject_outliers(cross_distance, output, settings):
     for i,key in enumerate(list(cross_distance.keys())):
         chainage = cross_distance[key].copy()
         if sum(np.isnan(chainage)) == len(chainage):
-            print('→ %s: has no intersections')
+            print('→ {key}: has no intersections')
             chain_dict[key] = chainage
             continue
 

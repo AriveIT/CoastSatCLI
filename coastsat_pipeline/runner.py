@@ -34,7 +34,7 @@ class PipelineRunner:
 
         for idx, stage in enumerate(self.stages):
             ran = False
-            if not stage.should_run(context):
+            if not stage.should_run(context, params):
                 logger.info("Skipping stage %s", stage.name)
             else:
                 checkpoints.save_context(context, stage.name)

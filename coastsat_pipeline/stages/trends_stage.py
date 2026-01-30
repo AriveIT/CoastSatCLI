@@ -14,13 +14,16 @@ class TrendCalculationStage(PipelineStage):
 
     def run(self, context: PipelineContext, params: Parameters) -> None:
         transects = context.transects
-        processed = context.cross_distance_processed or context.cross_distance_tidally_corrected
+        processed = context.cross_distance_processed or context.cross_distance_tidally_corrected or context.cross_distance
         output = context.shoreline_output
         settings = context.analysis_settings
         slope_est = context.slope_est
         trend_dict = context.trend_dict
 
-        if None in (transects, processed, output, settings, slope_est, trend_dict):
+
+        # print(processed)
+
+        if None in (transects, processed, output, settings, trend_dict):
             raise RuntimeError("TrendCalculationStage missing required context data.")
 
         self.logger.info("Calculating shoreline trends for %d transects", len(transects))
@@ -31,7 +34,7 @@ class TrendCalculationStage(PipelineStage):
             settings=settings,
             slope_est=slope_est,
             trend_dict=trend_dict,
-            default_slope=params.default_slope
+            # default_slope=params.default_slope
         )
 
         context.trend_results = trend_results
