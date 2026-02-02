@@ -342,6 +342,22 @@ def compute_intersection_QC(output, transects, settings):
                 # remove points that are too far landwards relative to the transect origin (i.e., negative chainage)
                 xy_rot[0, xy_rot[0,:] < settings['min_chainage']] = np.nan
                 
+                # ["transect_001", "transect_050"]
+                if key in ["transect_001", "transect_050"]:
+                    centroids = cluster1d(xy_rot[0,~np.isnan(xy_rot[0,:])], threshold=15)
+                    plot_intersections(
+                        xy_rot[0,:],
+                        key,
+                        sl,
+                        i,
+                        transects[key][0,:],
+                        transects[key][-1,:],
+                        settings['min_chainage'],
+                        settings['past_dist'],
+                        along_dist,
+                        centroids,
+                        output['dates'][i])
+
                 # compute std, median, max, min of the intersections
                 std_intersect[i] = np.nanstd(xy_rot[0,:])
                 med_intersect[i] = np.nanmedian(xy_rot[0,:])
@@ -349,6 +365,8 @@ def compute_intersection_QC(output, transects, settings):
                 min_intersect[i] = np.nanmin(xy_rot[0,:])
                 prc_intersect[i] = np.nanpercentile(xy_rot[0,:], settings['min_prc'])
                 n_intersect[i] = np.sum(~np.isnan(xy_rot[0, :]))  # count only non-nan values
+
+
                 
         # quality control the intersections using dispersion metrics (std and range)
         condition1 = std_intersect <= settings['max_std']
@@ -409,6 +427,61 @@ def compute_intersection_QC(output, transects, settings):
 
     return cross_dist
 
+# simple gap based clustering based on given threshold
+def cluster1d(intersections, threshold):
+    sorted = np.sort(intersections)
+    gaps = np.diff(sorted)
+    idx = np.where(gaps > threshold)[0]
+    clusters = np.split(sorted, idx + 1)
+    centroids = np.array([np.mean(c) for c in clusters])
+    return centroids
+
+def plot_intersections(intersections, key, sl, sl_idx, transect_p0, transect_p1, min_chainage, past_dist, along_dist, centroids, date):
+    x_max = max(transect_p0[0], transect_p1[0])
+    x_min = min(transect_p0[0], transect_p1[0])
+    x_range = x_max - x_min
+    y_max = max(transect_p0[1], transect_p1[1])
+    y_min = min(transect_p0[1], transect_p1[1])
+    y_range = y_max - y_min
+
+
+    fig, axs = plt.subplots(1, 2)
+    fig.suptitle(f'{key} vs shoreline {sl_idx} - {date}')
+
+    axs[0].plot(intersections, np.zeros_like(intersections), 'o', alpha=0.5)
+    axs[0].plot(centroids, np.zeros_like(centroids), 'o', c='black')
+
+    axs[1].plot(sl[:, 0], sl[:, 1], ".", markersize=2)
+    axs[1].plot([transect_p0[0], transect_p1[0]], [transect_p0[1], transect_p1[1]], alpha=0.5)
+    collider = get_transect_collider(transect_p0, transect_p1, min_chainage, past_dist, along_dist)
+    axs[1].plot(*collider, c='red')
+    centroid_trans = get_centroids_along_transect(transect_p0, transect_p1, centroids)
+    # print(centroid_trans)
+    axs[1].plot(centroid_trans[:, 0], centroid_trans[:, 1], ".", c='black', markersize=6)
+    axs[1].set_ylim(y_min - 1.5 * y_range, y_max + 1.5 * y_range)
+    axs[1].set_xlim(x_min - 1.5 * x_range, x_max + 1.5 * x_range)
+
+    plt.tight_layout()
+    fig.savefig(f"C:\\Users\\avanever\\Documents\\CoastSatProject\\{key}_intersection_plots\\{key}_sl_{sl_idx}.png")
+
+def get_centroids_along_transect(p0, p1, centroids):
+    d = p1 - p0
+    norm = d / np.linalg.norm(d)
+    centroid_trans = np.array([p0 + c * norm for c in centroids])
+    return centroid_trans
+
+def get_transect_collider(p0, p1, min_chainage, past_dist, along_dist):
+    d = p1 - p0
+    norm = d / np.linalg.norm(d)
+    orth = np.array([norm[1], -norm[0]])
+
+    v1 = p1 + past_dist * norm - along_dist * orth
+    v2 = p1 + past_dist * norm + along_dist * orth
+    v3 = p0 + min_chainage * norm + along_dist * orth # min_chainage is negative (if points before origin are allowed)
+    v4 = p0 + min_chainage * norm - along_dist * orth
+
+    return ([v1[0], v2[0], v3[0], v4[0], v1[0]], [v1[1], v2[1], v3[1], v4[1], v1[1]])
+
 ###################################################################################################
 # DESPIKING/OUTLIER REMOVAL
 ###################################################################################################
@@ -442,7 +515,7 @@ def reject_outliers(cross_distance, output, settings):
     for i,key in enumerate(list(cross_distance.keys())):
         chainage = cross_distance[key].copy()
         if sum(np.isnan(chainage)) == len(chainage):
-            print('→ {key}: has no intersections')
+            print(f'→ {key}: has no intersections')
             chain_dict[key] = chainage
             continue
 
