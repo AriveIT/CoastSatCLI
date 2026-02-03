@@ -62,6 +62,17 @@ def extract_shorelines(metadata, settings):
     # Cache to avoid recomputing identical shoreline buffers
     buffer_cache = {}
 
+    # Vectorize label to on_water map once
+    """
+    - other       --> label = 0 --> on_water = 0
+    - sand        --> label = 1 --> on_water = 0
+    - whitewater  --> label = 2 --> on_water = 1
+    - water       --> label = 3 --> on_water = 1
+    """
+    label_to_on_water = lambda l: 0 if l == 0 or l == 1 else 1 if l == 2 or l == 3 else -1
+    vmap = np.vectorize(label_to_on_water)
+    transects = np.array(list(SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"]).values()))
+
     for satname in metadata.keys():
 
         filepath = SDS_tools.get_filepath(settings['inputs'],satname)
@@ -74,6 +85,7 @@ def extract_shorelines(metadata, settings):
         output_geoaccuracy = []
         output_idxkeep = []
         output_t_mndwi = []
+        output_transect_origin_classes = []
 
         str_new = ''
         if not sklearn.__version__[:4] == '0.20':
@@ -122,10 +134,10 @@ def extract_shorelines(metadata, settings):
             buffer_key = (tuple(cloud_mask.shape), tuple(np.round(georef, 6)))
 
             if buffer_key in buffer_cache:
-                print("  | Buffer (cached)", end='')
+                print("Buffer (cached)")
                 im_ref_buffer = buffer_cache[buffer_key]
             else:
-                print("  | Buffer (computed)", end='')
+                print("Buffer (computed)")
                 im_ref_buffer = create_shoreline_buffer(cloud_mask.shape, georef, image_epsg, settings)
                 buffer_cache[buffer_key] = im_ref_buffer
 
@@ -161,6 +173,9 @@ def extract_shorelines(metadata, settings):
                 if skip_image:
                     continue
 
+            # determine if transect origins are on land or water
+            on_water = get_transect_origin_classes(transects, im_classif, settings, georef, filenames[i], vmap, image_epsg)
+
             output_timestamp.append(metadata[satname]['dates'][i])
             output_shoreline.append(shoreline)
             output_filename.append(filenames[i])
@@ -168,6 +183,7 @@ def extract_shorelines(metadata, settings):
             output_geoaccuracy.append(metadata[satname]['acc_georef'][i])
             output_idxkeep.append(i)
             output_t_mndwi.append(t_mndwi)
+            output_transect_origin_classes.append(on_water)
 
         output[satname] = {
             'dates': output_timestamp,
@@ -177,6 +193,7 @@ def extract_shorelines(metadata, settings):
             'geoaccuracy': output_geoaccuracy,
             'idx': output_idxkeep,
             'MNDWI_threshold': output_t_mndwi,
+            'transect_origin_classes': output_transect_origin_classes
         }
 
     if plt.get_fignums():
@@ -189,6 +206,44 @@ def extract_shorelines(metadata, settings):
         pickle.dump(output, f)
 
     return output
+
+
+def get_transect_origin_classes(transects, im_classif, settings, georef, filename, vmap, image_epsg):
+    transect_origins = transects[:,0,:]
+    transect_origins_pxl = np.round(SDS_tools.convert_world2pix(SDS_tools.convert_epsg(transect_origins,
+                                                                    settings['output_epsg'],
+                                                                    image_epsg), georef)).astype(int)
+    
+    # filter out indices outside of image
+    idx_outside = np.where(
+        np.logical_or(
+            np.logical_or(transect_origins_pxl[:,1] > im_classif.shape[0],
+            transect_origins_pxl[:,1] < 0),
+            np.logical_or(transect_origins_pxl[:,0] > im_classif.shape[1],
+            transect_origins_pxl[:,0] < 0)
+        )
+    )[0]
+
+    # fill in indices for now so sampling can run
+    # (this feels kinda hacky, and also messes up plotting for transects outside image bounds)
+    transect_origins_pxl[idx_outside] = np.array([0,0]) 
+
+    labels = im_classif[transect_origins_pxl[:,1], transect_origins_pxl[:,0]]
+    on_water = vmap(labels)
+    on_water[idx_outside] = -1 # overwrite indices outside image
+
+    # plot_classified_transect_origins(transect_origins_pxl, on_water, im_classif, filename)
+    return on_water
+ 
+def plot_classified_transect_origins(transect_origins_pxl, on_water, im, filename):   
+    fig, ax = plt.subplots()
+    ax.imshow(im)
+    colors = ["blue" if w==1 else "green" if w==0 else "gray" for w in on_water]
+    ax.scatter(transect_origins_pxl[:,0], transect_origins_pxl[:,1], c=colors, s=0.1)
+    fig.savefig(f"C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\classif_plots\\{filename}.png", dpi=400)
+    plt.close(fig)
+
+
 ###################################################################################################
 # IMAGE CLASSIFICATION FUNCTIONS
 ###################################################################################################
