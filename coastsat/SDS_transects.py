@@ -289,10 +289,6 @@ def compute_intersection_QC(output, transects, settings):
     shorelines = output['shorelines']
     along_dist = settings['along_dist']
 
-    # print(f"{len(output['transect_origin_classes'][0])}")
-    # exit()
-
-
     # loop through each transect
     n = len(transects.keys())
     for key in transects.keys():
@@ -306,9 +302,10 @@ def compute_intersection_QC(output, transects, settings):
         prc_intersect = np.zeros(len(shorelines))
         n_intersect = np.zeros(len(shorelines))
 
-        ema = 0 # exponential moving average
+        ema = np.nan # exponential moving average
         alpha = 0.1 # how much to weight most recent centroid
-        
+        bad_intersection_count = 0
+
         # loop through each shoreline
         for i in range(len(shorelines)):
 
@@ -349,41 +346,54 @@ def compute_intersection_QC(output, transects, settings):
                 # remove points that are too far landwards relative to the transect origin (i.e., negative chainage)
                 xy_rot[0, xy_rot[0,:] < settings['min_chainage']] = np.nan
                 
-                # ["transect_001", "transect_050"]
-                if key in ["transect_001", "transect_050"]:
-                    centroids = cluster1d(xy_rot[0,~np.isnan(xy_rot[0,:])], threshold=15)
-                    transect_class = output['transect_origin_classes'][i][key_to_idx(key)]
-                    centroid_idx = -1
-                    if len(centroids) == 2 and transect_class != -1:
-                        centroid_idx = select_centroid(centroids, transect_class)
-                        ema = update_ema(ema, alpha, centroids[centroid_idx])
-                    elif len(centroids) == 1:
-                        ema = update_ema(ema, alpha, centroids[0])
-                    
-                    # plot_intersections(
-                    #     xy_rot[0,:],
-                    #     key,
-                    #     sl,
-                    #     i,
-                    #     transects[key][0,:],
-                    #     transects[key][-1,:],
-                    #     settings['min_chainage'],
-                    #     settings['past_dist'],
-                    #     along_dist,
-                    #     centroids,
-                    #     output['dates'][i],
-                    #     centroid_idx,
-                    #     transect_class,
-                    #     ema)
+                clusters = cluster1d(xy_rot[0,~np.isnan(xy_rot[0,:])], threshold=15)
+                centroids = np.array([np.mean(c) for c in clusters])
+                transect_class = output['transect_origin_classes'][i][key_to_idx(key)]
+                
+                if len(clusters) == 2 and transect_class != -1:
+                    centroid_idx = select_centroid(centroids, transect_class)
+                elif len(centroids) == 1:
+                    centroid_idx = 0
+                else:
+                    # if >=3 clusters or 2 clusters and no transect class
+                    std_intersect[i] = np.nan
+                    med_intersect[i] = np.nan
+                    max_intersect[i] = np.nan
+                    min_intersect[i] = np.nan
+                    prc_intersect[i] = np.nan
+                    n_intersect[i] = np.nan
+                    bad_intersection_count += 1
+                    continue
+                
+                ema = update_ema(ema, alpha, centroids[centroid_idx])
+                intersections = np.concatenate([clusters[centroid_idx], [np.nan]]) # concatenate w nan so stats functions run
+
+                # if key in ["transect_001", "transect_050", "transect_150", "transect_145", "transect_139"]:
+                # if key in ["transect_256"]:
+                #     plot_intersections(
+                #         xy_rot[0,:],
+                #         key,
+                #         sl,
+                #         i,
+                #         transects[key][0,:],
+                #         transects[key][-1,:],
+                #         settings['min_chainage'],
+                #         settings['past_dist'],
+                #         along_dist,
+                #         centroids,
+                #         output['dates'][i],
+                #         centroid_idx,
+                #         transect_class,
+                #         ema)
+                #     pass
 
                 # compute std, median, max, min of the intersections
-                std_intersect[i] = np.nanstd(xy_rot[0,:])
-                med_intersect[i] = np.nanmedian(xy_rot[0,:])
-                max_intersect[i] = np.nanmax(xy_rot[0,:])
-                min_intersect[i] = np.nanmin(xy_rot[0,:])
-                prc_intersect[i] = np.nanpercentile(xy_rot[0,:], settings['min_prc'])
-                n_intersect[i] = np.sum(~np.isnan(xy_rot[0, :]))  # count only non-nan values
-
+                std_intersect[i] = np.nanstd(intersections)
+                med_intersect[i] = np.nanmedian(intersections)
+                max_intersect[i] = np.nanmax(intersections)
+                min_intersect[i] = np.nanmin(intersections)
+                prc_intersect[i] = np.nanpercentile(intersections, settings['min_prc'])
+                n_intersect[i] = np.sum(~np.isnan(intersections))  # count only non-nan values
 
                 
         # quality control the intersections using dispersion metrics (std and range)
@@ -391,7 +401,8 @@ def compute_intersection_QC(output, transects, settings):
         condition2 = (max_intersect - min_intersect) <= settings['max_range']
         condition3 = n_intersect >= settings['min_points']
         idx_good = np.logical_and(np.logical_and(condition1, condition2), condition3)
-        
+        # print(sum(~idx_good), bad_intersection_count)
+
         # save copy for QA plot later
         # med_intersect_temp = med_intersect.copy()
         # max_intersect_temp = max_intersect.copy()
@@ -442,13 +453,15 @@ def compute_intersection_QC(output, transects, settings):
         #     print('%s  - removed %d'%(key, sum(np.isnan(med_intersect))))
 
     print()
-
+    exit()
     return cross_dist
+
 
 def update_ema(ema, alpha, new_value):
     if np.isnan(new_value): return ema
     if ema == 0: return new_value
     return new_value * alpha + ema * (1-alpha)
+
 
 # simple gap based clustering based on given threshold
 def cluster1d(intersections, threshold):
@@ -456,19 +469,21 @@ def cluster1d(intersections, threshold):
     gaps = np.diff(sorted)
     idx = np.where(gaps > threshold)[0]
     clusters = np.split(sorted, idx + 1)
-    centroids = np.array([np.mean(c) for c in clusters])
-    return centroids
+    # centroids = np.array([np.mean(c) for c in clusters])
+    return clusters
 
-# assuming key is "transect_xxx", return xxx as an int
+
+# assuming key is "transect_xxx", return xxx - 1 as an int
 def key_to_idx(key):
-    return int(key.split("_")[1])
+    return int(key.split("_")[1]) - 1
+
 
 # transect_class = 1 --> transect origin is on water
 # assumes exactly 2 centroids, and transect classes are valid (0 or 1)
 # determines which shoreline to pick (first or second centroid)
 def select_centroid(centroids, transect_class):
-    # if transect_class == -1: return -1
     return int(np.logical_xor(transect_class, np.logical_xor(centroids[0] > 0, centroids[1] > 0)))
+
 
 def plot_intersections(intersections, key, sl, sl_idx, transect_p0, transect_p1, min_chainage, past_dist, along_dist, centroids, date, centroid_idx, transect_class, ema):
     x_max = max(transect_p0[0], transect_p1[0])
@@ -515,19 +530,22 @@ def plot_intersections(intersections, key, sl, sl_idx, transect_p0, transect_p1,
     axs[1].scatter(ema_trans[:, 0], ema_trans[:, 1], facecolors='none', edgecolors='purple', s=200)
 
     # for better visibility
+    # axs[1].axis('equal') # note: some centroids look off because of skew, but uncommenting this zooms out a lot (kinda ignores lims)
     axs[1].set_ylim(y_min - 1.5 * y_range, y_max + 1.5 * y_range)
     axs[1].set_xlim(x_min - 1.5 * x_range, x_max + 1.5 * x_range)
     axs[0].get_yaxis().set_visible(False)
 
     fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=3)
-    fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value in rect reserves some place for the legend to sit
+    fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
     fig.savefig(f"C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\{key}_intersection_plots\\{key}_sl_{sl_idx}.png")
+
 
 def get_centroids_along_transect(p0, p1, centroids):
     d = p1 - p0
     norm = d / np.linalg.norm(d)
     centroid_trans = np.array([p0 + c * norm for c in centroids])
     return centroid_trans
+
 
 def get_transect_collider(p0, p1, min_chainage, past_dist, along_dist):
     d = p1 - p0
@@ -536,7 +554,7 @@ def get_transect_collider(p0, p1, min_chainage, past_dist, along_dist):
 
     v1 = p1 + past_dist * norm - along_dist * orth
     v2 = p1 + past_dist * norm + along_dist * orth
-    v3 = p0 + min_chainage * norm + along_dist * orth # min_chainage is negative (if points before origin are allowed)
+    v3 = p0 + min_chainage * norm + along_dist * orth # min_chainage is already relative to origin (don't need to subtract)
     v4 = p0 + min_chainage * norm - along_dist * orth
 
     return ([v1[0], v2[0], v3[0], v4[0], v1[0]], [v1[1], v2[1], v3[1], v4[1], v1[1]])

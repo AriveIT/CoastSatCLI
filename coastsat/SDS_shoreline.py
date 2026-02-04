@@ -62,16 +62,7 @@ def extract_shorelines(metadata, settings):
     # Cache to avoid recomputing identical shoreline buffers
     buffer_cache = {}
 
-    # Vectorize label to on_water map once
-    """
-    - other       --> label = 0 --> on_water = 0
-    - sand        --> label = 1 --> on_water = 0
-    - whitewater  --> label = 2 --> on_water = 1
-    - water       --> label = 3 --> on_water = 1
-    """
-    label_to_on_water = lambda l: 0 if l == 0 or l == 1 else 1 if l == 2 or l == 3 else -1
-    vmap = np.vectorize(label_to_on_water)
-    transects = np.array(list(SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"]).values()))
+    transect_origins = np.array(list(SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"]).values()))[:,0,:]
 
     for satname in metadata.keys():
 
@@ -143,6 +134,7 @@ def extract_shorelines(metadata, settings):
 
             im_classif, im_labels = classify_image_NN(im_ms, cloud_mask, min_beach_area_pixels, clf)
 
+            im_mndwi = None
             if settings['adjust_detection']:
                 date = filenames[i][:19]
                 skip_image, shoreline, t_mndwi = adjust_detection(im_ms, cloud_mask, im_nodata, im_labels,
@@ -174,7 +166,8 @@ def extract_shorelines(metadata, settings):
                     continue
 
             # determine if transect origins are on land or water
-            on_water = get_transect_origin_classes(transects, im_classif, settings, georef, filenames[i], vmap, image_epsg)
+            if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
+            on_water = get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
             output_timestamp.append(metadata[satname]['dates'][i])
             output_shoreline.append(shoreline)
@@ -208,39 +201,36 @@ def extract_shorelines(metadata, settings):
     return output
 
 
-def get_transect_origin_classes(transects, im_classif, settings, georef, filename, vmap, image_epsg):
-    transect_origins = transects[:,0,:]
+def get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask, settings, georef, filename, image_epsg):
     transect_origins_pxl = np.round(SDS_tools.convert_world2pix(SDS_tools.convert_epsg(transect_origins,
                                                                     settings['output_epsg'],
                                                                     image_epsg), georef)).astype(int)
-    
+
     # filter out indices outside of image
-    idx_outside = np.where(
-        np.logical_or(
-            np.logical_or(transect_origins_pxl[:,1] > im_classif.shape[0],
-            transect_origins_pxl[:,1] < 0),
-            np.logical_or(transect_origins_pxl[:,0] > im_classif.shape[1],
-            transect_origins_pxl[:,0] < 0)
-        )
-    )[0]
+    inside_x = (transect_origins_pxl[:, 1] < im_mndwi.shape[0]) & (transect_origins_pxl[:, 1] >= 0)
+    inside_y = (transect_origins_pxl[:, 0] < im_mndwi.shape[1]) & (transect_origins_pxl[:, 0] >= 0)
+    inside = inside_x & inside_y
 
-    # fill in indices for now so sampling can run
-    # (this feels kinda hacky, and also messes up plotting for transects outside image bounds)
-    transect_origins_pxl[idx_outside] = np.array([0,0]) 
+    # if transect is inside image, check if on cloud pixel. Otherwise set to False
+    # cloud_mask is True where a cloud is. Therefore valid should be True if cloud_mask is False
+    valid = np.full(inside.shape, False)
+    valid[inside] = ~cloud_mask[transect_origins_pxl[inside, 1], transect_origins_pxl[inside, 0]]
+  
+    # value < t_mndwi means water
+    on_water = np.full(inside.shape, -1)
+    on_water[valid] = (im_mndwi[transect_origins_pxl[valid,1], transect_origins_pxl[valid,0]] < t_mndwi).astype(int)
 
-    labels = im_classif[transect_origins_pxl[:,1], transect_origins_pxl[:,0]]
-    on_water = vmap(labels)
-    on_water[idx_outside] = -1 # overwrite indices outside image
-
-    # plot_classified_transect_origins(transect_origins_pxl, on_water, im_classif, filename)
+    # dir = "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\classif_plots\\mndwi"
+    # plot_classified_transect_origins(transect_origins_pxl, on_water, im_mndwi, filename, dir)
     return on_water
  
-def plot_classified_transect_origins(transect_origins_pxl, on_water, im, filename):   
+
+def plot_classified_transect_origins(transect_origins_pxl, on_water, im, filename, dir):   
     fig, ax = plt.subplots()
     ax.imshow(im)
     colors = ["blue" if w==1 else "green" if w==0 else "gray" for w in on_water]
     ax.scatter(transect_origins_pxl[:,0], transect_origins_pxl[:,1], c=colors, s=0.1)
-    fig.savefig(f"C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\classif_plots\\{filename}.png", dpi=400)
+    fig.savefig(f"{dir}\\{filename}_mndwi.png", dpi=400)
     plt.close(fig)
 
 
