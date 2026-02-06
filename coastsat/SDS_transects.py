@@ -457,7 +457,6 @@ def compute_intersection_QC(output, transects, settings):
         #     print('%s  - removed %d'%(key, sum(np.isnan(med_intersect))))
 
     print()
-    exit()
     return cross_dist
 
 
@@ -703,10 +702,11 @@ def reject_outliers(cross_distance, output, settings):
             ax[1].plot(dates3, chainage3-mean_cross_dist, 'C0-o', ms=4, mfc='w', mec='C0')
             ax[1].set(ylabel='distance [m]',
                       title= 'Post-processed time-series - %d points' % (len(chainage3)))
+            fig.savefig(f"{settings['plot_dir']}\\{key}_outlier_rejection.png")
 
     return chain_dict
 
-def identify_outliers(chainage, dates, cross_change):
+def identify_outliers(chainage, dates, cross_change, debug=False):
     """
     Remove outliers based on despiking [iterative method]
     
@@ -734,11 +734,17 @@ def identify_outliers(chainage, dates, cross_change):
     # loop through the time-series always starting from the start
     # when an outlier is found, remove it and restart
     # repeat until no more outliers are found in the time-series
-    k = 0
-    while k < len(chainage_temp):
-        
+    done = False
+    if debug: print(f"{len(chainage_temp) = }")
+    while not done:
+
+        # if all but last point has been removed, throw that one away too
+        if len(chainage_temp) <= 1:
+            chainage_temp.pop(k)
+            dates_temp.pop(k)
+            break
+
         for k in range(len(chainage_temp)):
-            
             # check if the first point is an outlier
             if k == 0:
                 # difference between 1st and 2nd point in the time-series
@@ -746,15 +752,18 @@ def identify_outliers(chainage, dates, cross_change):
                 if np.abs(diff) > cross_change:
                     chainage_temp.pop(k)  
                     dates_temp.pop(k)
+                    if debug: print("first point is outlier")
                     break
                 
             # check if the last point is an outlier
             elif k == len(chainage_temp)-1:
+                done = True # now have looked through entire time-series
                 # difference between last and before last point in the time-series
                 diff = chainage_temp[k] - chainage_temp[k-1]
                 if np.abs(diff) > cross_change:
                     chainage_temp.pop(k)  
                     dates_temp.pop(k) 
+                    if debug: print("last point is outlier")
                     break
                 
             # check if a point is an isolated outlier or in a group of 2 consecutive outliers
@@ -770,6 +779,7 @@ def identify_outliers(chainage, dates, cross_change):
                 if np.logical_and(np.logical_and(condition1,condition2),condition3):
                     chainage_temp.pop(k)  
                     dates_temp.pop(k) 
+                    if debug: print("removed isolated outlier")
                     break
                 
                 # check for 2 consecutive outliers in the time-series
@@ -787,10 +797,12 @@ def identify_outliers(chainage, dates, cross_change):
                     if np.logical_and(np.logical_and(condition1,condition5),condition6):
                         chainage_temp.pop(k)  
                         dates_temp.pop(k) 
+                        if debug: print("removed doubled outlier")
                         break
                     elif np.logical_and(np.logical_and(condition2,condition4),condition7):
                         chainage_temp.pop(k)  
                         dates_temp.pop(k) 
+                        if debug: print("removed doubled outlier")
                         break
                     
                     # also look for clusters of 3 outliers
@@ -804,17 +816,13 @@ def identify_outliers(chainage, dates, cross_change):
                         if np.logical_and(np.logical_and(np.logical_and(condition4b,condition5b),
                                                          np.logical_and(~condition1,~condition2)),
                                                          condition8):
-                            print('*', end='')
+                            if debug: print('*', end='')
                             chainage_temp.pop(k)  
                             dates_temp.pop(k) 
-                            break                            
-        
-        # if one full loop is completed (went through all the time-series without removing outlier)
-        # then increment k to get out of the loop
-        k = k + 1
-            
+                            if debug: print("removed tripled outlier")
+                            break                                        
      
-    # return the time-series where the outliers have been removed           
+    # return the time-series where the outliers have been removed
     return chainage_temp, dates_temp
 
 ###################################################################################################
