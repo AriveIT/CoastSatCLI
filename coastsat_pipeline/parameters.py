@@ -98,13 +98,18 @@ class Parameters:
         # max = use maximum intersection
         # auto = if more than auto_prc% of intersections for a given transect (across shorelines) have std>max_std, use maximum intersection
         # min = take the shore_prc th percentile
-        "multiple_inter": "min",
+        "multiple_inter": "nan",
 
         # percentage to use in 'auto' mode to blend between 'nan' and 'max'
         # auto_prc = 0.0 --> max
         # auto_prc = 1.0 --> nan
         "auto_prc": 0.05,
         'min_prc': 15, # what percentile to take in "min" 
+
+        "cluster_intersection_selection": True, # use clustering intersection algorithm
+        "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
+        "transects_to_plot": ["transect_007"], #["transect_202", "transect_205"], # plot all intersections for transects with these keys
+        "transect_plot_dir": "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\"
     }
 
     outlier_settings = {
