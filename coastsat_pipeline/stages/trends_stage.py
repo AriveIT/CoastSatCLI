@@ -20,9 +20,6 @@ class TrendCalculationStage(PipelineStage):
         slope_est = context.slope_est
         trend_dict = context.trend_dict
 
-
-        # print(processed)
-
         if None in (transects, processed, output, settings, trend_dict):
             raise RuntimeError("TrendCalculationStage missing required context data.")
 
@@ -34,7 +31,7 @@ class TrendCalculationStage(PipelineStage):
             settings=settings,
             slope_est=slope_est,
             trend_dict=trend_dict,
-            # default_slope=params.default_slope
+            trend_plot_dir=params.alternate_trend_plot_dir,
         )
 
         context.trend_results = trend_results

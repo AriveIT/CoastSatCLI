@@ -150,3 +150,11 @@ class Parameters:
 
     # this is also used in tide.py
     default_slope = 0.1 # default slope used when error occurs in slope estimation
+
+    #######################
+    # Timeseries
+    #######################
+    # give entire path to put seasonal and monthly trend plots, and where the geojson points to
+    # if None, then puts everything in output folder
+    # Intended for putting outputs of many sites in one place, for easier webmap creation
+    alternate_trend_plot_dir = None

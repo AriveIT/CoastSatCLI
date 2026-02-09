@@ -28,9 +28,11 @@ def run_time_series_post_processing(
     settings: Dict[str, Any],
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],
+    trend_plot_dir: str | None,
     options: TimeSeriesOptions | None = None,
 ) -> TimeSeriesResult:
     options = options or TimeSeriesOptions()
+    (seasonal_path, monthly_path) = _get_full_plot_path(trend_plot_dir, settings)
     cross_distance = {key: np.asarray(series, dtype=float).copy() for key, series in cross_distance_tidally_corrected.items()}
     dates = output["dates"]
 
@@ -53,9 +55,9 @@ def run_time_series_post_processing(
             processed += 1
 
             if settings.get("save_figure", False) and options.save_seasonal_plots:
-                _plot_seasonal_average(key, valid_dates, valid_chainage, settings)
+                _plot_seasonal_average(key, valid_dates, valid_chainage, seasonal_path)
             if settings.get("save_figure", False) and options.save_monthly_plots:
-                _plot_monthly_average(key, valid_dates, valid_chainage, settings)
+                _plot_monthly_average(key, valid_dates, valid_chainage, monthly_path)
 
         else:
             trend = np.nan
@@ -68,6 +70,21 @@ def run_time_series_post_processing(
     print(f"\nProcessed {processed} transects (skipped {skipped} due to insufficient data)")
     return TimeSeriesResult(cross_distance=cross_distance, trend_dict=trend_dict, processed_transects=processed, skipped_transects=skipped)
 
+def _get_full_plot_path(trend_plot_dir, settings):
+    if trend_plot_dir:
+        os.makedirs(os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"]), exist_ok=True)
+        os.makedirs(os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"]), exist_ok=True)
+        return (
+            os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"]),
+            os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"])
+        )
+    else:
+        os.makedirs(os.path.join(settings["inputs"]["filepath"], "seasonal_plots"), exist_ok=True)
+        os.makedirs(os.path.join(settings["inputs"]["filepath"], "monthly_plots"), exist_ok=True)
+        return (
+            os.path.join(settings["inputs"]["filepath"], "seasonal_plots"),
+            os.path.join(settings["inputs"]["filepath"], "monthly_plots")
+        )
 
 def _write_time_series_csv(transects, cross_distance, dates, settings):
     # Emit per-transect CSV time series for downstream use.
@@ -79,7 +96,7 @@ def _write_time_series_csv(transects, cross_distance, dates, settings):
     df.to_csv(fn, sep=",")
 
 
-def _plot_seasonal_average(key, dates, chainage, settings):
+def _plot_seasonal_average(key, dates, chainage, trend_plot_dir):
     """Plot seasonal averages and seasonal trends for a transect."""
     dict_seas, dates_seas, chainage_seas, list_seas = SDS_transects.seasonal_average(dates.tolist(), chainage.tolist())
     overall_trend, overall_fit = SDS_transects.calculate_trend(dates_seas, chainage_seas)
@@ -133,11 +150,11 @@ def _plot_seasonal_average(key, dates, chainage, settings):
 
     ax.plot(dates_seas, overall_fit, "--", color="b", label=f"trend {overall_trend:.1f} m/year")
     ax.legend(loc="lower left", ncol=6, markerscale=1.5, frameon=True, edgecolor="k", columnspacing=1)
-    fig.savefig(os.path.join(settings["inputs"]["filepath"], f"{key}_seasonal_average.jpg"))
+    fig.savefig(os.path.join(trend_plot_dir, f"{key}_seasonal_average.jpg"))
     plt.close(fig)
 
 
-def _plot_monthly_average(key, dates, chainage, settings):
+def _plot_monthly_average(key, dates, chainage, trend_plot_dir):
     """Plot monthly averages for a transect."""
     dict_month, dates_month, chainage_month, list_month = SDS_transects.monthly_average(dates.tolist(), chainage.tolist())
     month_colors = plt.get_cmap("tab20")
@@ -160,5 +177,5 @@ def _plot_monthly_average(key, dates, chainage, settings):
             ms=5,
         )
     ax.legend(loc="lower left", ncol=7, markerscale=1.5, frameon=True, edgecolor="k", columnspacing=1)
-    fig.savefig(os.path.join(settings["inputs"]["filepath"], f"{key}_monthly_average.jpg"))
+    fig.savefig(os.path.join(trend_plot_dir, f"{key}_monthly_average.jpg"))
     plt.close(fig)
