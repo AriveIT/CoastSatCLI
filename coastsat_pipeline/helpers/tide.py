@@ -10,6 +10,9 @@ import pandas as pd
 from coastsat import SDS_tools
 from ..parameters import TideOptions
 
+from datetime import datetime
+import pytz
+
 
 def apply_tide_correction(
     output: Dict[str, Any],
@@ -63,12 +66,15 @@ def _apply_csv_tide_correction(
     beach_slope = tide_inputs.get("beach_slope") or options.beach_slope or default_slope
     tide_data = pd.read_csv(path)
     if "dates" not in tide_data.columns or "tide" not in tide_data.columns:
+        print(tide_data.columns)
         raise ValueError("Tide CSV must contain 'dates' and 'tide' columns")
-
-    dates_ts = [pd.to_datetime(d).to_pydatetime() for d in tide_data["dates"]]
+    
+    print(f"Converting {len(tide_data['dates'])} dates...")
+    # dates_ts = [pd.to_datetime(d).to_pydatetime() for d in tide_data["dates"]] # this takes a while
+    dates_ts = [_ensure_aware(pd.to_datetime(d)) for d in tide_data["dates"]] # this takes a while
     tides_ts = np.asarray(tide_data["tide"], dtype=float)
     dates_sat = output["dates"]
-    tides_sat = np.asarray(SDS_tools.get_closest_datapoint(dates_sat, dates_ts, tides_ts), dtype=float)
+    tides_sat = np.asarray(SDS_tools.get_closest_datapoint(dates_sat, dates_ts, tides_ts), dtype=float) # note: no interpolation
 
     tide_filter_cfg = settings.get("tide_filter")
     tide_filter_mask = np.ones_like(tides_sat, dtype=bool)
@@ -119,6 +125,13 @@ def _apply_csv_tide_correction(
         _write_tidally_corrected_csv(cross_distance_tidally_corrected, dates_sat, settings)
     return cross_distance_tidally_corrected
 
+def _ensure_aware(date):
+    if not isinstance(date, datetime):
+        date = pd.to_datetime(date).to_pydatetime()
+
+    if date.tzinfo is None or date.tzinfo.utcoffset(date) is None:
+        return pytz.utc.localize(date)
+    return date.astimezone(pytz.utc)
 
 def _write_tidally_corrected_csv(
     cross_distance_tidally_corrected: Dict[str, np.ndarray],

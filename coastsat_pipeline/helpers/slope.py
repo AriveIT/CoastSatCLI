@@ -31,6 +31,11 @@ def run_slope_estimation(
     fp_slopes = os.path.join(settings["inputs"]["filepath"], options.cache_dir_name)
     os.makedirs(fp_slopes, exist_ok=True)
 
+    tide_inputs = settings["inputs"]
+    print(tide_inputs)
+    if tide_inputs.get("tide_csv_path"):
+        return None, None, None
+
     centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, output, date_range, tide_timestep)
 
     (

@@ -125,7 +125,7 @@ class Parameters:
     #####################
     # Slope Estimation
     #####################
-    # date range used specifically for slope estimation. Should have at least 2 satellite data available
+    # date range used specifically for slope estimation. Should have at least 2 satellite missions available
     slope_estimation_date_range = [
         pytz.utc.localize(datetime(2020, 1, 1)),
         pytz.utc.localize(datetime(2025, 1, 1)),

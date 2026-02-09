@@ -29,6 +29,7 @@ def _build_inputs_dict(raw_config: Dict[str, Any], download_filters) -> Dict[str
         "reference_geojson": inputs_section["reference_shoreline"],
         "transect_geojson": inputs_section["transects"],
         "fes_config": inputs_section.get("fes_config"),
+        "tide_csv_path": inputs_section.get("tide_csv_path")
     }
     inputs.update(download_filters)
 

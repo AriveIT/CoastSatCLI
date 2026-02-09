@@ -34,6 +34,7 @@ def run_batch_shoreline_detection(
     preprocess_images(metadata, settings, options, scene_metrics_manifest, scene_metrics_path)
     cached_output = load_cached_output(settings, cache_enabled=options.cache_enabled)
     if cached_output is not None:
+        print("Using cached shorelines extraction output")
         return cached_output
 
     # Reload updated metrics and quality config after preprocessing/selection.
