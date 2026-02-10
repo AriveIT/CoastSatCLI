@@ -45,4 +45,4 @@ class TideCorrectionStage(PipelineStage):
         context.cross_distance_tidally_corrected = corrected
 
     def should_run(self, context: PipelineContext, params: Parameters) -> bool:
-        return params.apply_tide_correcion
+        return params.apply_tide_correction

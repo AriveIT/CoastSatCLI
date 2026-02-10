@@ -51,7 +51,7 @@ class TimeSeriesOptions:
 
 @dataclass
 class Parameters:
-    apply_tide_correcion = True # False means skip slope estimation and tide correction
+    apply_tide_correction = True # False means skip slope estimation and tide correction
 
     #####################
     # Initialization
