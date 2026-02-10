@@ -181,7 +181,7 @@ def _init_site(
 )
 def main() -> None:
     parser = GooeyParser(description="Create CoastSat settings.json and optionally run analysis.")
-    parser.add_argument("--engine", choices=["legacy", "pipeline"], default="legacy", help="Analysis engine to run after init.")
+    parser.add_argument("--engine", choices=["legacy", "pipeline"], default="pipeline", help="Analysis engine to run after init.")
     parser.add_argument("--base_dir", required=True, widget="DirChooser", help="Base directory where the project folder will be created.")
     parser.add_argument("--sitename", required=True, help="Project name (used as folder name).")
     parser.add_argument("--shoreline", required=True, widget="FileChooser", help="Shoreline GeoJSON/Shapefile covering the AOI(s).")

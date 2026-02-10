@@ -11,10 +11,10 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = True # plots all extracted shorelines in different colours
-    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = True # skip saving jpg altogether (intended for when rerunning site)
+    skip_jpg: bool = False # skip saving jpg altogether (intended for when rerunning site)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
@@ -109,14 +109,14 @@ class Parameters:
         "cluster_intersection_selection": True, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
         "transects_to_plot": [], #["transect_202", "transect_205"], # plot all intersections for transects with these keys
-        "transect_plot_dir": "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\"
+        "transect_plot_dir": "" # need valid path here
     }
 
     outlier_settings = {
         "max_cross_change": 40, # maximum cross-shore change allowed between consecutive timesteps
         "otsu_threshold": [-0.5, 0], # min and max intensity threshold use for contouring the shoreline
-        "plot_fig": False, # display time series before and after outlier rejection for each transect
-        "plot_dir": "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\reject_outliers"
+        "plot_fig": True, # display time series before and after outlier rejection for each transect
+        "plot_dir": "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\rose-spit-SLC-outliers" # need valid path here
     }
     
     # passed to SDS_tools.remove_inaccurate_georef
