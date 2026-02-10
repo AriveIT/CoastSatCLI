@@ -184,10 +184,12 @@ def retrieve_images(inputs):
             if im_timestamp.year >= 2022 and satname == 'L7':
                 continue
             # additionally, skip L7 after Scan-Line-Correction failure
-            if 'skip_L7_SLC' in inputs.keys():
-                if inputs['skip_L7_SLC']:
-                    if im_timestamp >= pytz.utc.localize(datetime(2003,5,31)):
-                        continue
+            if ('skip_L7_SLC' in inputs.keys() and
+                    inputs['skip_L7_SLC'] and
+                    satname == 'L7' and
+                    im_timestamp >= pytz.utc.localize(datetime(2003,5,31))):
+                print("Skipping L7 after Scan-Line-Correction failure")
+                continue
             
             # get epsg code
             im_epsg = int(im_meta['bands'][0]['crs'][5:])
@@ -467,11 +469,11 @@ def retrieve_images(inputs):
             # Emit download progress when the integer percent changes (GUI-friendly).
             pct = int((i + 1) / len(im_dict_T1[satname]) * 100)
             if pct != last_pct:
-                print(f"{pct}%", flush=True)
+                print(f"\r{pct}%", flush=True, end='')
                 last_pct = pct
 
         print('')
-
+        
     # once all images have been downloaded, load metadata from .txt files
     metadata = get_metadata(inputs)
     
