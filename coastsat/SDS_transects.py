@@ -637,7 +637,10 @@ def reject_outliers(cross_distance, output, settings):
     chain_dict = dict([])
 
     print("Cleaning time series data (removing outliers)...")
-    
+
+    if settings['plot_fig']:
+        os.makedirs(f"{settings['plot_dir']}\\outlier_rejection", exist_ok=True)
+
     for i,key in enumerate(list(cross_distance.keys())):
         chainage = cross_distance[key].copy()
         if sum(np.isnan(chainage)) == len(chainage):
@@ -667,6 +670,7 @@ def reject_outliers(cross_distance, output, settings):
         if len(chainage2) <= 1: # identify_outliers crashes if only 1 observation (also can't have outlier if only 1 obs)
             print(f"Warning: {key} has only {len(chainage2)} valid intersections, results may be untrustworthy")
             chainage3 = chainage2
+            dates3 = dates2
         else:
             chainage3, dates3 = identify_outliers(chainage2, dates2, settings['max_cross_change'])
             if len(chainage3) < 30:
@@ -691,20 +695,21 @@ def reject_outliers(cross_distance, output, settings):
             ax[0].grid(linestyle=':', color='0.5')
             ax[0].set(ylabel='distance [m]',
                       title= 'Transect %s original time-series - %d points' % (key, len(chainage1)))
-            mean_cross_dist = np.nanmedian(chainage3)
+            
+            # note: chainages used to be centered at 0 (by subtracting the mean), but this made comparison to other plots difficult
             # plot the data points
-            ax[0].plot(dates1, chainage1-mean_cross_dist, 'C0-')
-            ax[0].plot(dates1, chainage1-mean_cross_dist, 'C2o', ms=4, mec='k', mew=0.7,label='otsu')
+            ax[0].plot(dates1, chainage1, 'C0-')
+            ax[0].plot(dates1, chainage1, 'C2o', ms=4, mec='k', mew=0.7,label='otsu')
             # plot the indices removed because of the threshold
-            ax[0].plot(dates2, chainage2-mean_cross_dist, 'C3o', ms=4, mec='k', mew=0.7,label='spike')
+            ax[0].plot(dates2, chainage2, 'C3o', ms=4, mec='k', mew=0.7,label='spike')
             ax[0].legend(ncol=2,loc='upper right')
             # plot the final time-series
-            ax[0].plot(dates3, chainage3-mean_cross_dist, 'C0o', ms=4, mfc='w', mec='C0')
+            ax[0].plot(dates3, chainage3, 'C0o', ms=4, mfc='w', mec='C0')
             ax[1].grid(linestyle=':', color='0.5') 
-            ax[1].plot(dates3, chainage3-mean_cross_dist, 'C0-o', ms=4, mfc='w', mec='C0')
+            ax[1].plot(dates3, chainage3, 'C0-o', ms=4, mfc='w', mec='C0')
             ax[1].set(ylabel='distance [m]',
                       title= 'Post-processed time-series - %d points' % (len(chainage3)))
-            fig.savefig(f"{settings['plot_dir']}\\{key}_outlier_rejection.png")
+            fig.savefig(f"{settings['plot_dir']}\\outlier_rejection\\{key}_outlier_rejection.png")
 
     return chain_dict
 

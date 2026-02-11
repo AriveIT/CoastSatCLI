@@ -32,7 +32,6 @@ def run_slope_estimation(
     os.makedirs(fp_slopes, exist_ok=True)
 
     tide_inputs = settings["inputs"]
-    print(tide_inputs)
     if tide_inputs.get("tide_csv_path"):
         return None, None, None
 

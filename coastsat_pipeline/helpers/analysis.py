@@ -41,7 +41,7 @@ def run_shoreline_analysis(
     if settings.get("save_figure", False) and options.plot_transects:
         _plot_shorelines_with_transects(output, transects, settings)
 
-    cross_distance = _compute_cross_distance(output, transects, transect_settings, outlier_settings)
+    cross_distance = _compute_cross_distance(output, transects, transect_settings, outlier_settings, settings["inputs"]["filepath"])
 
     if settings.get("save_figure", False) and options.plot_time_series:
         _plot_time_series(output, cross_distance, settings)
@@ -75,7 +75,10 @@ def _compute_cross_distance(
         transects: Dict[str, Any],
         transect_settings: Dict[str, Any],
         outlier_settings: Dict[str, Any],
+        plot_dir: str,
 ) -> Dict[str, Any]:
+    transect_settings["transect_plot_dir"] = plot_dir
+    outlier_settings["plot_dir"] = plot_dir
     cross_distance = SDS_transects.compute_intersection_QC(output, transects, transect_settings)
     return SDS_transects.reject_outliers(cross_distance, output, outlier_settings)
 

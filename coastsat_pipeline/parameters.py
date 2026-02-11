@@ -108,15 +108,13 @@ class Parameters:
 
         "cluster_intersection_selection": True, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": [], #["transect_202", "transect_205"], # plot all intersections for transects with these keys
-        "transect_plot_dir": "" # need valid path here
+        "transects_to_plot": ["transect_002", "transect_012", "transect_050"], # plot all intersections for transects with these keys
     }
 
     outlier_settings = {
         "max_cross_change": 40, # maximum cross-shore change allowed between consecutive timesteps
         "otsu_threshold": [-0.5, 0], # min and max intensity threshold use for contouring the shoreline
         "plot_fig": True, # display time series before and after outlier rejection for each transect
-        "plot_dir": "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\rose-spit-SLC-outliers" # need valid path here
     }
     
     # passed to SDS_tools.remove_inaccurate_georef
