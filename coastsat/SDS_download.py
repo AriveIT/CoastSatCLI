@@ -672,7 +672,10 @@ def check_images_available(inputs):
                     # get the indices of the images that are not already downloaded 
                     idx_new = np.where([ not avail_date in downloaded_dates for avail_date in avail_date_list])[0]
                     im_dict_T1[satname] = [im_dict_T1[satname][index] for index in idx_new]
-                    print('%s: %d images already exist, %s to download'%(satname, len(avail_date_list), len(idx_new)))
+                    print('%s: %d/%d images already exist, %s to be downloaded'%(satname,
+                                                                            len(downloaded_dates),
+                                                                            len(avail_date_list),
+                                                                            len(idx_new)))
 
     # if only S2 is in sat_list, stop here as no Tier 2 for Sentinel
     if len(inputs['sat_list']) == 1 and inputs['sat_list'][0] == 'S2':
