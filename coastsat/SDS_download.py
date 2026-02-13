@@ -157,6 +157,8 @@ def retrieve_images(inputs):
 
         # print how many images will be downloaded for the users
         print('%s: %d images'%(satname,len(im_dict_T1[satname])))
+        if satname == 'L7' and inputs.get('skip_L7_SLC', False):
+            print(f"Skipping L7 after SLC failure, progress likely won't reach 100%")
 
         # create subfolder structure to store the different bands
         filepaths = SDS_tools.create_folder_structure(im_folder, satname)
@@ -188,7 +190,6 @@ def retrieve_images(inputs):
                     inputs['skip_L7_SLC'] and
                     satname == 'L7' and
                     im_timestamp >= pytz.utc.localize(datetime(2003,5,31))):
-                print("Skipping L7 after Scan-Line-Correction failure")
                 continue
             
             # get epsg code
