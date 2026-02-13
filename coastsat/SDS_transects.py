@@ -291,7 +291,7 @@ def compute_intersection_QC(output, transects, settings):
 
     # loop through each transect
     n = len(transects.keys())
-    for key in transects.keys():
+    for transect_idx, key in enumerate(transects.keys()):
         print(f'\rProcessing {key} out of {str(n)}...', end='')
         
         # initialise variables
@@ -347,7 +347,7 @@ def compute_intersection_QC(output, transects, settings):
                 xy_rot[0, xy_rot[0,:] < settings['min_chainage']] = np.nan
                 
                 if settings.get('cluster_intersection_selection', False):
-                    transect_class = output['transect_origin_classes'][i][key_to_idx(key)]
+                    transect_class = output['transect_origin_classes'][i][transect_idx]
                     clusters, centroids, c_idx = cluster_intersection_selection(
                         intersections = xy_rot[0,~np.isnan(xy_rot[0,:])],
                         clustering_threshold = settings['clustering_threshold'],
@@ -464,11 +464,6 @@ def update_ema(ema, alpha, new_value):
     if np.isnan(new_value): return ema
     if np.isnan(ema): return new_value
     return new_value * alpha + ema * (1-alpha)
-
-
-# assuming key is "transect_xxx", return xxx - 1 as an int
-def key_to_idx(key):
-    return int(key.split("_")[1]) - 1
 
 
 ###################################################################################################
