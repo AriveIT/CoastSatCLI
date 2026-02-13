@@ -237,6 +237,8 @@ def main() -> None:
 
     if args.tide_method == "fes" and not args.fes_config:
         raise ValueError("Tide method FES is selected. Please select a FES config file")
+    if args.tide_method == "csv" and not args.tide_csv:
+        raise ValueError("Tide method CSV is selected. Please select a CSV tide file")
 
     if args.mode == "single":
         if not args.aoi:
