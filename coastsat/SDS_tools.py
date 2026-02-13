@@ -1146,6 +1146,8 @@ def select_valid_centroid(geom: Polygon, ocean_tide, load_tide):
                     return result['coord']
 
         print(f"[Centroid Refinement] ⚠️ No better refinement found. Defaulting to best candidate: {base_coord} with ocean flags {best['ocean_flags']}")
+        if score(best['ocean_flags']) == 4:
+            raise Exception("Unable to find flags for given AOI. Make sure AOI is contained in FES grid")
         return base_coord
 
     return refine(best['coord'])
