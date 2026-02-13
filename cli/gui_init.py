@@ -304,6 +304,7 @@ def main() -> None:
                 print(f"  {r['settings_path'].parent.name}: success")
             else:
                 print(f"  {r['settings_path'].parent.name}: failed (exit code {exit_code})")
+                exit(1)
 
 
 if __name__ == "__main__":
