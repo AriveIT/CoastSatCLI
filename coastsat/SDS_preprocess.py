@@ -714,7 +714,7 @@ def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None, m
         for i in range(len(filenames)):
             pct = int((i + 1) / len(filenames) * 100)
             if pct != last_pct:
-                print(f"{pct}%", flush=True)
+                print(f"\r{pct}%", flush=True, end='')
                 last_pct = pct
             # image filename
             fn = SDS_tools.get_filenames(filenames[i],filepath, satname)
@@ -778,7 +778,7 @@ def save_jpg(metadata, settings, use_matplotlib=False, debug_skipped_dir=None, m
             create_jpg(im_ms, cloud_mask, date, satname, filepath_jpg, use_matplotlib)
             if metrics_entry is not None and metrics_callback is not None:
                 metrics_callback(metrics_entry)
-        print('')
+        print()
     # print the location where the images have been saved
     print('Satellite images saved as .jpg in ' + os.path.join(filepath_data,
                                                     'jpg_files', 'preprocessed'))
