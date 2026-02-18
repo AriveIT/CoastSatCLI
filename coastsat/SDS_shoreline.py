@@ -107,8 +107,12 @@ def extract_shorelines(metadata, settings):
                 last_pct = pct
 
             fn = SDS_tools.get_filenames(filenames[i], filepath, satname)
-            im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = SDS_preprocess.preprocess_single(
-                fn, satname, settings['cloud_mask_issue'], settings['pan_off'], settings['s2cloudless_prob'])
+            try:
+                im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = SDS_preprocess.preprocess_single(
+                    fn, satname, settings['cloud_mask_issue'], settings['pan_off'], settings['s2cloudless_prob'])
+            except Exception as e:
+                print(f'Could not map shoreline for this image: {filenames[i]}, reason: {e}')
+                continue
 
             image_epsg = metadata[satname]['epsg'][i]
 
