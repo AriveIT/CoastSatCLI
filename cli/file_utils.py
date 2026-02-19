@@ -59,5 +59,5 @@ def clear_output_directory(output_dir: Path, prompt: bool = True) -> list[str]:
             item.unlink()
             cleared.append(item.name)
 
-    typer.secho(f"  ✓ Cleared {len(cleared)} files from output directory.", fg=typer.colors.YELLOW)
+    typer.secho(f"  Cleared {len(cleared)} files from output directory.", fg=typer.colors.YELLOW)
     return cleared

@@ -925,9 +925,9 @@ def make_animation_mp4(filepath_images, fps, fn_out):
                 image = imread(filepath)
                 writer.append_data(image)
             except Exception as e:
-                print(f"⚠️ Skipped frame {i}: {filepath} due to error: {e}")
+                print(f"Skipped frame {i}: {filepath} due to error: {e}")
 
-    print(f"✅ MP4 animation saved at: {fn_out}")
+    print(f"MP4 animation saved at: {fn_out}")
 
 
 
@@ -1116,14 +1116,14 @@ def select_valid_centroid(geom: Polygon, ocean_tide, load_tide):
     for lon, lat in test_coords:
         lon_adj = lon + 360 if lon < 0 else lon
         result = evaluate([lon_adj, lat])
-        print(f"  • Tested point: [{lon_adj:.4f}, {lat:.4f}] → Ocean Flags: {result['ocean_flags']}")
+        print(f"Tested point: [{lon_adj:.4f}, {lat:.4f}] --> Ocean Flags: {result['ocean_flags']}")
         candidates.append(result)
 
     candidates.sort(key=lambda r: score(r['ocean_flags']))
     best = candidates[0]
 
     if score(best['ocean_flags']) == 0:
-        print(f"[Centroid Selection] ✅ Selected best candidate: {best['coord']} with ocean flags {best['ocean_flags']}")
+        print(f"[Centroid Selection] Selected best candidate: {best['coord']} with ocean flags {best['ocean_flags']}")
         return best['coord']
 
     print("[Centroid Selection] No ideal candidate found (flag 4). Starting refinement sweep...")
@@ -1139,13 +1139,13 @@ def select_valid_centroid(geom: Polygon, ocean_tide, load_tide):
                 lon_test = lon0 + dx * r
                 lat_test = lat0 + dy * r
                 result = evaluate([lon_test, lat_test])
-                print(f"  • Refinement test at radius {r:.2f}: [{lon_test:.4f}, {lat_test:.4f}] → Ocean Flags: {result['ocean_flags']}")
+                print(f"Refinement test at radius {r:.2f}: [{lon_test:.4f}, {lat_test:.4f}] --> Ocean Flags: {result['ocean_flags']}")
                 if score(result['ocean_flags']) == 0:
                     lon, lat = float(result['coord'][0]), float(result['coord'][1])
                     print(f"[Centroid] Refined to: [{lon:.6f}, {lat:.6f}] with ocean flags {result['ocean_flags']}")
                     return result['coord']
 
-        print(f"[Centroid Refinement] ⚠️ No better refinement found. Defaulting to best candidate: {base_coord} with ocean flags {best['ocean_flags']}")
+        print(f"[Centroid Refinement] No better refinement found. Defaulting to best candidate: {base_coord} with ocean flags {best['ocean_flags']}")
         if score(best['ocean_flags']) == 4:
             raise Exception("Unable to find flags for given AOI. Make sure AOI is contained in FES grid")
         return base_coord

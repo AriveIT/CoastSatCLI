@@ -34,11 +34,11 @@ def choose_file(
         root.destroy()
 
         if filepath:
-            typer.secho(f"  ✓ You selected: {filepath}", fg=typer.colors.GREEN)
+            typer.secho(f"  You selected: {filepath}", fg=typer.colors.GREEN)
             return filepath
 
         if not typer.confirm("No file was selected. Would you like to try again?"):
-            typer.secho("  ⚠️  Operation cancelled by user.", fg=typer.colors.YELLOW)
+            typer.secho("  Operation cancelled by user.", fg=typer.colors.YELLOW)
             raise typer.Exit()
 
 
@@ -59,11 +59,11 @@ def choose_folder(title: str = "Select a folder") -> str:
         root.destroy()
 
         if folder:
-            typer.secho(f"  ✓ You selected: {folder}", fg=typer.colors.GREEN)
+            typer.secho(f"  You selected: {folder}", fg=typer.colors.GREEN)
             return folder
 
         if not typer.confirm("No folder was selected. Would you like to try again?"):
-            typer.secho("  ⚠️  Operation cancelled by user.", fg=typer.colors.YELLOW)
+            typer.secho("  Operation cancelled by user.", fg=typer.colors.YELLOW)
             raise typer.Exit()
         
 def choose_file_multiple(title: str = "Select AOI file(s)") -> list[str]:
@@ -77,13 +77,13 @@ def choose_file_multiple(title: str = "Select AOI file(s)") -> list[str]:
         root.destroy()
 
         if filepaths:
-            typer.secho("  ✓ You selected:", fg=typer.colors.GREEN)
+            typer.secho("  You selected:", fg=typer.colors.GREEN)
             for fp in filepaths:
                 typer.echo(f"     • {fp}")
             return list(filepaths)
 
         if not typer.confirm("No files were selected. Would you like to try again?"):
-            typer.secho("  ⚠️  Operation cancelled by user.", fg=typer.colors.YELLOW)
+            typer.secho("  Operation cancelled by user.", fg=typer.colors.YELLOW)
             raise typer.Exit()
 
 
@@ -132,23 +132,23 @@ def get_tide_correction_settings() -> dict:
     Ask the user which tide correction method to use (CSV or FES),
     and gather all required inputs for that method using GUI dialogs.
     """
-    typer.echo("→ How would you like to apply tidal correction?")
-    typer.echo("   • csv : Use a tide level CSV file (e.g., from tide gauge or external source)")
-    typer.echo("   • fes : Use the built-in FES2022 tide model (requires YAML config)")
+    typer.echo("--> How would you like to apply tidal correction?")
+    typer.echo("   csv : Use a tide level CSV file (e.g., from tide gauge or external source)")
+    typer.echo("   fes : Use the built-in FES2022 tide model (requires YAML config)")
 
     method = typer.prompt("  Enter your choice [csv/fes]", default="fes").strip().lower()
     settings = {"method": method}
 
     if method == "csv":
-        typer.echo("\n→ Tide CSV selected.")
+        typer.echo("\n--> Tide CSV selected.")
         settings["tide_csv_path"] = choose_file("Select Tide CSV", filetypes=[("CSV files", "*.csv")])
         settings["reference_elevation"] = float(typer.prompt("Reference elevation (e.g., 0 for MSL)", default="0"))
         settings["beach_slope"] = float(typer.prompt("Beach slope (e.g., 0.1)", default="0.1"))
     elif method == "fes":
-        typer.echo("\n→ FES tide model selected.")
+        typer.echo("\n--> FES tide model selected.")
         settings["fes_config"] = choose_file("Select FES2022 YAML config", filetypes=[("YAML files", "*.yaml;*.yml")])
     else:
-        typer.secho("❌ Invalid method. Choose 'csv' or 'fes'.", fg=typer.colors.RED)
+        typer.secho("Invalid method. Choose 'csv' or 'fes'.", fg=typer.colors.RED)
         raise typer.Exit()
 
     tide_filter = prompt_tide_filter_settings()
@@ -158,7 +158,7 @@ def get_tide_correction_settings() -> dict:
     return settings
         
 def get_transect_settings_from_user() -> dict:
-    if typer.confirm("→ Do you want to customize transect settings?", default=False):
+    if typer.confirm("--> Do you want to customize transect settings?", default=False):
         spacing = typer.prompt("  Enter transect spacing (m)", default=100.0)
         length = typer.prompt("  Enter transect length (m)", default=200.0)
         offset_ratio = typer.prompt("  Enter transect offset ratio (e.g., 0.75 = 75% over water and 25% over land)", default=0.75)
@@ -181,7 +181,7 @@ def prompt_and_run_analysis(settings_paths: list[str], engine: str = "legacy"):
     Prompts user to run analysis on the provided list of settings.json paths.
     Handles both single and batch site cases.
     """
-    typer.echo("\n→ Would you like to begin the full analysis now?")
+    typer.echo("\n--> Would you like to begin the full analysis now?")
     root_msg = tk.Tk()
     root_msg.withdraw()
     root_msg.attributes("-topmost", True)
@@ -192,17 +192,17 @@ def prompt_and_run_analysis(settings_paths: list[str], engine: str = "legacy"):
     root_msg.destroy()
 
     if not run_now:
-        typer.secho("  ⚠️  Analysis skipped by user.", fg=typer.colors.YELLOW)
+        typer.secho("  Analysis skipped by user.", fg=typer.colors.YELLOW)
         return
 
     for settings_path in settings_paths:
         sitename = Path(settings_path).parent.name
-        typer.echo(f"\n→ Running analysis for {sitename}...")
+        typer.echo(f"\n--> Running analysis for {sitename}...")
         exit_code = run_analysis_from_config(Path(settings_path), engine=engine)
         if exit_code == 0:
-            typer.secho(f"  ✓ {sitename} completed successfully!", fg=typer.colors.GREEN)
+            typer.secho(f"  {sitename} completed successfully!", fg=typer.colors.GREEN)
         else:
-            typer.secho(f"  ❌ {sitename} failed with exit code {exit_code}.", fg=typer.colors.RED)
+            typer.secho(f"  {sitename} failed with exit code {exit_code}.", fg=typer.colors.RED)
 
 def run_analysis_from_config(config_path: Path, engine: str = "legacy") -> int:
     """

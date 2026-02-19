@@ -49,33 +49,33 @@ def initialize_single_site(
     #start timer
     start = time.time()
     
-    typer.echo("→ Building CoastSat site from AOI and shoreline...")
+    typer.echo("--> Building CoastSat site from AOI and shoreline...")
     paths = setup_project_directories(base_dir, sitename)
     site_dir = paths["site_dir"]
     output_dir = paths["output_dir"]
     aoi_dest = paths["aoi_dest"]
     ref_out_path = paths["ref_out_path"]
     transects_out_path = paths["transects_out_path"]
-    typer.echo(f"→ Creating project folder under\n    {site_dir}")
+    typer.echo(f"--> Creating project folder under\n    {site_dir}")
 
     # Detect EPSG from AOI
     auto_epsg = detect_or_prompt_epsg(aoi_path)
 
     
     # Read AOI
-    typer.echo("→ Loading AOI and shoreline data…")
+    typer.echo("--> Loading AOI and shoreline data…")
     aoi_gdf, shoreline_gdf = load_aoi_and_shoreline(aoi_path, shoreline_path, preloaded_shoreline)
 
     # Clip shoreline
-    typer.echo("→ Creating reference shoreline…")
+    typer.echo("--> Creating reference shoreline…")
     reference_gdf = create_and_save_reference_shoreline(
     shoreline_gdf=shoreline_gdf,
     aoi_gdf=aoi_gdf,
     output_path=ref_out_path)
-    typer.secho(f"  ✓ Reference shoreline saved to {ref_out_path}", fg=typer.colors.GREEN)
+    typer.secho(f"  Reference shoreline saved to {ref_out_path}", fg=typer.colors.GREEN)
 
     # Generate transects
-    typer.echo("→ Generating transects…")
+    typer.echo("--> Generating transects…")
     transects_gdf = generate_and_save_transects(
     reference_gdf=reference_gdf,
     epsg=auto_epsg,
@@ -85,12 +85,12 @@ def initialize_single_site(
     skip_threshold=transect_skip_threshold,
     output_path=transects_out_path
 )
-    typer.secho(f"  ✓ Transects saved to {transects_out_path}", fg=typer.colors.GREEN)
+    typer.secho(f"  Transects saved to {transects_out_path}", fg=typer.colors.GREEN)
 
     # Copy AOI
-    typer.echo("→ Copying AOI to project input folder…")
+    typer.echo("--> Copying AOI to project input folder…")
     shutil.copy2(aoi_path, aoi_dest)
-    typer.secho(f"  ✓ AOI copied to {aoi_dest}", fg=typer.colors.GREEN)
+    typer.secho(f"  AOI copied to {aoi_dest}", fg=typer.colors.GREEN)
 
     # Create settings.json
     settings = {
@@ -120,23 +120,23 @@ def initialize_single_site(
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=4)
 
-    typer.secho("\n✅ Project initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
-    typer.echo(f"  • Sitename            : {sitename}")
-    typer.echo(f"  • Output EPSG         : {auto_epsg}")
-    typer.echo(f"  • AOI (rel. path)     : {settings['inputs']['aoi_path']}")
-    typer.echo(f"  • Reference GeoJSON   : {settings['inputs']['reference_shoreline']}")
-    typer.echo(f"  • Transects GeoJSON   : {settings['inputs']['transects']}")
+    typer.secho("\nProject initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
+    typer.echo(f"  Sitename            : {sitename}")
+    typer.echo(f"  Output EPSG         : {auto_epsg}")
+    typer.echo(f"  AOI (rel. path)     : {settings['inputs']['aoi_path']}")
+    typer.echo(f"  Reference GeoJSON   : {settings['inputs']['reference_shoreline']}")
+    typer.echo(f"  Transects GeoJSON   : {settings['inputs']['transects']}")
     if tide_config["method"] == "fes":
-        typer.echo(f"  • FES YAML (abs. path): {settings['inputs']['fes_config']}")
+        typer.echo(f"  FES YAML (abs. path): {settings['inputs']['fes_config']}")
     elif tide_config["method"] == "csv":
-        typer.echo(f"  • Tide CSV (abs. path): {settings['inputs']['tide_csv_path']}")
-        typer.echo(f"  • Ref. Elevation      : {settings['inputs']['reference_elevation']}")
-        typer.echo(f"  • Beach Slope         : {settings['inputs']['beach_slope']}")
+        typer.echo(f"  Tide CSV (abs. path): {settings['inputs']['tide_csv_path']}")
+        typer.echo(f"  Ref. Elevation      : {settings['inputs']['reference_elevation']}")
+        typer.echo(f"  Beach Slope         : {settings['inputs']['beach_slope']}")
     if tide_config.get("tide_filter"):
         tf = tide_config["tide_filter"]
-        typer.echo(f"  �� Tide filter percentiles : {tf['lower_percentile']:g} - {tf['upper_percentile']:g}")
-    typer.echo(f"  • Output directory    : {settings['output_dir']}\n")
-    typer.echo(f"  ⏱ Site processed in {time.time() - start:.2f} seconds")
+        typer.echo(f"  Tide filter percentiles : {tf['lower_percentile']:g} - {tf['upper_percentile']:g}")
+    typer.echo(f"  Output directory    : {settings['output_dir']}\n")
+    typer.echo(f"  Site processed in {time.time() - start:.2f} seconds")
 
     return {
         "sitename": sitename,
@@ -171,44 +171,44 @@ def init(
     """
     typer.secho("\n=== CoastSat Project Initialization ===", fg=typer.colors.CYAN, bold=True)
     typer.echo("You will be guided through:")
-    typer.echo("  • Selecting a base directory for your project")
-    typer.echo("  • Naming the project)")
-    typer.echo("  • Choosing AOI's")
-    typer.echo("  • Creating the folder structure and writing a settings.json\n")
+    typer.echo("  Selecting a base directory for your project")
+    typer.echo("  Naming the project)")
+    typer.echo("  Choosing AOI's")
+    typer.echo("  Creating the folder structure and writing a settings.json\n")
 
     # 1) Select project folder
-    typer.echo("→ Step 1: Choose the base directory where your new project will live.")
+    typer.echo("--> Step 1: Choose the base directory where your new project will live.")
     project_dir = choose_folder("Choose base project directory")
 
     # 2) Ask for sitename
-    typer.echo("\n→ Step 2: Enter a project (site) name (e.g., tuk, patty).")
+    typer.echo("\n--> Step 2: Enter a project (site) name (e.g., tuk, patty).")
     sitename = typer.prompt("  Sitename").strip().lower()
     while not sitename:
         sitename = typer.prompt("  Sitename cannot be empty. Please enter a short name").strip().lower()
-    typer.secho(f"  ✓ Project name set to '{sitename}'\n", fg=typer.colors.GREEN)
+    typer.secho(f"  Project name set to '{sitename}'\n", fg=typer.colors.GREEN)
 
     # 3) select large coastline that includes AOI
-    typer.echo("\n→ Step 3: Select your full shoreline file (GeoJSON or Shapefile).")
+    typer.echo("\n--> Step 3: Select your full shoreline file (GeoJSON or Shapefile).")
     shoreline_src = choose_file("Select shoreline file", filetypes=[("Shapefiles", "*.shp"), ("GeoJSON", "*.geojson")])
 
     # 4) load shoreline data
-    typer.echo("→ Loading shoreline data (this may take a few minutes)…")
+    typer.echo("--> Loading shoreline data (this may take a few minutes)…")
     try:
         shoreline_gdf = gpd.read_file(shoreline_src)
     except Exception as e:
-        typer.secho(f"❌ Failed to read shoreline file: {e}", fg=typer.colors.RED)
+        typer.secho(f"Failed to read shoreline file: {e}", fg=typer.colors.RED)
         raise typer.Exit()
 
     # 5) Prompt for FES YAML (no copy)
     # 5) Prompt for tide correction method (CSV or FES)
-    typer.echo("\n→ Step 4: Choose a tidal correction method.")
+    typer.echo("\n--> Step 4: Choose a tidal correction method.")
     tide_config = get_tide_correction_settings()
 
     is_batch = typer.confirm("Would you like to initialize multiple AOIs as a batch?", default=False)
 
     if is_batch:
         # 6) Prompt for multiple AOI KML files
-        typer.echo("\n→ Step 5: Select your AOI KML files.")
+        typer.echo("\n--> Step 5: Select your AOI KML files.")
         aoi_srcs = choose_file_multiple("Select AOI KML files")
         transect_settings = get_transect_settings_from_user()
         settings_paths = []
@@ -230,19 +230,19 @@ def init(
             settings_paths.append(site_info['settings_path'])
 
         
-        typer.secho("\n✅ All AOIs initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
-        typer.secho("\n📦 Batch Initialization Summary:", fg=typer.colors.CYAN, bold=True)
+        typer.secho("\nAll AOIs initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
+        typer.secho("\nBatch Initialization Summary:", fg=typer.colors.CYAN, bold=True)
         for i, settings_path in enumerate(settings_paths):
             sitename = Path(settings_path).parent.name
             output_dir = Path(settings_path).parent / "outputs"
-            typer.echo(f"  • {sitename:<12} → {output_dir}")
+            typer.echo(f"  {sitename:<12} --> {output_dir}")
 
         # 7) Run analysis immediately
         prompt_and_run_analysis(settings_paths, engine=engine.lower())
 
     else:
         # 6) Prompt for single AOI KML file
-        typer.echo("\n→ Step 5: Select your AOI KML file.")
+        typer.echo("\n--> Step 5: Select your AOI KML file.")
         aoi_src = choose_file("Select AOI KML", filetypes=[("KML files", "*.kml")])
         transect_settings = get_transect_settings_from_user()
         # Initialize single site
@@ -259,7 +259,7 @@ def init(
             transect_skip_threshold=transect_settings["transect_skip_threshold"]
         )
 
-        typer.secho("\n✅ Project initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
+        typer.secho("\nProject initialized successfully!\n", fg=typer.colors.CYAN, bold=True)
 
         # 7) Run analysis immediately
         prompt_and_run_analysis([site_info['settings_path']], engine=engine.lower())
@@ -284,7 +284,7 @@ def site_rerun(
     typer.secho("\n=== CoastSat Site Rerun ===", fg=typer.colors.CYAN, bold=True)
 
     # Step 1: Select settings.json
-    typer.echo("→ Step 1: Select the existing project's settings.json file.")
+    typer.echo("--> Step 1: Select the existing project's settings.json file.")
     settings_path = choose_file("Select settings.json", filetypes=[("JSON files", "*.json")])
     base_dir = Path(settings_path).parent
 
@@ -293,10 +293,10 @@ def site_rerun(
         with open(settings_path, "r") as f:
             config = json.load(f)
     except Exception as e:
-        typer.secho(f"❌ Failed to load settings.json: {e}", fg=typer.colors.RED)
+        typer.secho(f"Failed to load settings.json: {e}", fg=typer.colors.RED)
         raise typer.Exit()
 
-    typer.secho(f"  ✓ Loaded settings for site: {config['inputs']['sitename']}\n", fg=typer.colors.GREEN)
+    typer.secho(f"  Loaded settings for site: {config['inputs']['sitename']}\n", fg=typer.colors.GREEN)
 
     # Track what needs regeneration
     regenerate_transects = False
@@ -308,17 +308,17 @@ def site_rerun(
     }
 
     # Step 3: Override options
-    typer.echo("→ Step 2: Would you like to override any of the following inputs?")
+    typer.echo("--> Step 2: Would you like to override any of the following inputs?")
 
     if typer.confirm("  • Reference shoreline file?", default=False):
         ref_path = choose_file("Select new reference shoreline", filetypes=[("GeoJSON", "*.geojson"), ("Shapefile", "*.shp")])
         ref_path = Path(ref_path).expanduser().resolve()
         target_path = Path(os.path.join(base_dir,config["inputs"]["reference_shoreline"])).resolve()
         shutil.copy2(ref_path, target_path)
-        typer.secho(f"  ✓ Replaced existing reference shoreline with: {ref_path.name}", fg=typer.colors.GREEN)
+        typer.secho(f"  Replaced existing reference shoreline with: {ref_path.name}", fg=typer.colors.GREEN)
         regenerate_transects = True
 
-    if typer.confirm("  • Transects file?", default=False):
+    if typer.confirm("  Transects file?", default=False):
         transects_path = choose_file("Select new transects file", filetypes=[("GeoJSON", "*.geojson"), ("Shapefile", "*.shp")])
         config["inputs"]["transects"] = str(Path(transects_path).resolve())
         regenerate_transects = False  # Don't regenerate if user chose a file manually
@@ -359,9 +359,9 @@ def run(
 
     exit_code = run_analysis_from_config(Path(config), engine=engine.lower())
     if exit_code == 0:
-        typer.secho("\n✅ Analysis completed successfully!", fg=typer.colors.GREEN)
+        typer.secho("\nAnalysis completed successfully!", fg=typer.colors.GREEN)
     else:
-        typer.secho(f"\n❌ Analysis failed with exit code {exit_code}.", fg=typer.colors.RED)
+        typer.secho(f"\nAnalysis failed with exit code {exit_code}.", fg=typer.colors.RED)
 
 if __name__ == "__main__":
     app()

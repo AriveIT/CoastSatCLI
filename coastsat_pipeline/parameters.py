@@ -14,7 +14,7 @@ class ImageryOptions:
     cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = False # skip saving jpg altogether (intended for when rerunning site)
+    skip_jpg: bool = True # skip saving jpg altogether (intended for when rerunning site)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
@@ -35,8 +35,8 @@ class TideOptions:
     beach_slope: Optional[float] = None # default beach slope for csv tidal correction if one not provided by user
 
 @dataclass
-class PlottingOptions:
-    trend_min: float = -30.0 # set range for plotting transects_colored_by_trend (currently transects aren't visible)
+class PlottingOptions: # transects_colored_by_trend (currently transects aren't visible)
+    trend_min: float = -30.0 # set range for trends
     trend_max: float = 30.0
     cmap_name: str = "RdBu_r" # colour bar
     dpi: int = 300
@@ -58,8 +58,8 @@ class Parameters:
     #####################
     # Note: these parameters only affect downloads. Analysis is unaffected (it is performed on anything already downloaded)
     download_filters = {
-        'dates': ["1984-01-01", "2025-01-01"], # range of dates of aquisitions to be downloaded
-        'sat_list': ["L5", "L7", "L8", "L9"], # satellite missions to download images from
+        'dates': ['1984-01-01', '2025-01-01'], #["1984-01-01", "2025-01-01"], # range of dates of aquisitions to be downloaded
+        'sat_list': ["L5", "L7", "L8", "L9"], #["L5", "L7", "L8", "L9"], # satellite missions to download images from
         # 'excluded_epsg_codes': ['32609'], # exclude images with given epsg codes
         # 'LandsatWRS': '055022', # specify a Landsat tile (WRS path/row)
         # 'S2tile': '09UVA', # specifies an S2 tile
@@ -68,47 +68,47 @@ class Parameters:
     }
 
     analysis_settings = {
-        "cloud_thresh": 0.2, # percentage of image that can be covered by cloud
-        "dist_clouds": 50, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
+        "cloud_thresh": 0.5, # percentage of image that can be covered by cloud
+        "dist_clouds": 300, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
         "check_detection": False, # if True, lets user manually accept/reject the mapped shorelines
         "adjust_detection": False, # lets user adjust the detected shorelines with a slide bar.
         "save_figure": True, # this has to be true for ANY figures to be saved
-        "min_beach_area": 500, # minimum number of pixels that have to be connected to belong to the SAND class
-        "min_length_sl": 200, # minimum length of shoreline perimeter to be kept (in meters)
+        "min_beach_area": 1000, # minimum number of pixels that have to be connected to belong to the SAND class
+        "min_length_sl": 500, # minimum length of shoreline perimeter to be kept (in meters)
         "cloud_mask_issue": False, # switch this parameter to True if sand pixels are masked (in black) on many images
         "sand_color": "default", # classification model: 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
         "pan_off": False, # True to switch pansharpening off for Landsat 7/8/9 imagery
-        "s2cloudless_prob": 20, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
-        "max_dist_ref" : 200, # maximum distance from the reference shoreline in meters
+        "s2cloudless_prob": 60, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
+        "max_dist_ref" : 100, # maximum distance from the reference shoreline in meters
     }
 
     #####################
     # Analysis
     #####################
     transect_settings = {
-        "along_dist": 35, # how far a point can be orthogonally to transect line
-        "past_dist": 300, # distance a shoreline points can be past end of transect and be counted as an intersection
-        "min_points": 4, # minimum number of points to calculate an intersections
-        "max_std": 20, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
-        "max_range": 20, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
-        "min_chainage": -50, # furthest landward of the transect origin that an intersection is accepted
+        "along_dist": 25, # how far a point can be orthogonally to transect line
+        "past_dist": 800, # distance a shoreline points can be past end of transect and be counted as an intersection
+        "min_points": 3, # minimum number of points to calculate an intersections
+        "max_std": 15, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
+        "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
+        "min_chainage": -100, # furthest landward of the transect origin that an intersection is accepted
         
         # method of dealing with transect/shorelines with large dispersion ('auto', 'nan', 'max')
         # nan = set values to nan
         # max = use maximum intersection
         # auto = if more than auto_prc% of intersections for a given transect (across shorelines) have std>max_std, use maximum intersection
         # min = take the shore_prc th percentile
-        "multiple_inter": "nan",
+        "multiple_inter": "auto",
 
         # percentage to use in 'auto' mode to blend between 'nan' and 'max'
         # auto_prc = 0.0 --> max
         # auto_prc = 1.0 --> nan
-        "auto_prc": 0.05,
+        "auto_prc": 0.1,
         'min_prc': 15, # what percentile to take in "min" 
 
-        "cluster_intersection_selection": True, # use clustering intersection algorithm
+        "cluster_intersection_selection": False, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": ["transect_002", "transect_012", "transect_050"], # plot all intersections for transects with these keys
+        "transects_to_plot": ["transect_076"], # plot all intersections for transects with these keys
     }
 
     outlier_settings = {

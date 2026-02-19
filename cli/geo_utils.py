@@ -115,7 +115,7 @@ def detect_or_prompt_epsg(aoi_path: str) -> int:
     """
     try:
         auto_epsg = pick_canadian_utm_epsg(aoi_path)
-        typer.secho(f"  ✓ Detected EPSG = {auto_epsg} from AOI centroid", fg=typer.colors.GREEN)
+        typer.secho(f"  Detected EPSG = {auto_epsg} from AOI centroid", fg=typer.colors.GREEN)
         return auto_epsg
     except Exception as e:
         typer.secho(f"  [!] Could not auto-select EPSG: {e}", fg=typer.colors.RED)
@@ -125,7 +125,7 @@ def detect_or_prompt_epsg(aoi_path: str) -> int:
         try:
             return int(epsg_input)
         except ValueError:
-            typer.secho("Invalid EPSG → exiting", fg=typer.colors.RED)
+            typer.secho("Invalid EPSG --> exiting", fg=typer.colors.RED)
             raise typer.Exit()
         
 
@@ -333,9 +333,9 @@ def regenerate_transects_from_config(
 
         transects_path = (base_dir / config["inputs"]["transects"]).resolve()
         transects_gdf.to_file(transects_path, driver="GeoJSON")
-        typer.secho(f"  ✓ Transects regenerated and saved to {transects_path}", fg=typer.colors.GREEN)
+        typer.secho(f"  Transects regenerated and saved to {transects_path}", fg=typer.colors.GREEN)
         return transects_gdf
 
     except Exception as e:
-        typer.secho(f"❌ Failed to regenerate transects: {e}", fg=typer.colors.RED)
+        typer.secho(f"Failed to regenerate transects: {e}", fg=typer.colors.RED)
         raise typer.Exit()

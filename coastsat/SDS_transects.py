@@ -639,7 +639,7 @@ def reject_outliers(cross_distance, output, settings):
     for i,key in enumerate(list(cross_distance.keys())):
         chainage = cross_distance[key].copy()
         if sum(np.isnan(chainage)) == len(chainage):
-            print(f'→ {key}: has no intersections')
+            print(f'--> {key}: has no intersections')
             chain_dict[key] = chainage
             continue
 
@@ -682,7 +682,7 @@ def reject_outliers(cross_distance, output, settings):
         # store in chain_dict
         chain_dict[key] = chainage
         
-        print('→ %s: Removed %d outliers'%(key, len(dates1) - len(dates3)))
+        print('--> %s: Removed %d outliers'%(key, len(dates1) - len(dates3)))
         # figure for QA
         if settings['plot_fig']:
             fig,ax=plt.subplots(2,1,figsize=[12,6], sharex=True)
