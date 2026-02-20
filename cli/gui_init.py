@@ -292,7 +292,7 @@ def main() -> None:
             print(f"  outputs dir  : {result['output_dir']}")
         except Exception as exc:  # noqa: BLE001
             print(f"Failed to initialize {sitename}: {exc}")
-            return
+            exit(1)
 
     print("\nInitialization complete.")
 
