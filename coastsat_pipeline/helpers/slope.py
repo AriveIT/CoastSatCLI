@@ -217,7 +217,7 @@ def _estimate_slopes(
                 SDS_slope.plot_spectrum_all(dates, composite, tsall, slope_settings, slope_est[key])
                 plt.gcf().savefig(os.path.join(fp_slopes, f"3_slope_spectrum_{key}.jpg"), dpi=200)
                 plt.close()
-            print(f"  → {key}: Estimated slope = {slope_est[key]:.3f} m (CI: {cis[key][0]:.4f} – {cis[key][1]:.4f})")
+            print(f"  --> {key}: Estimated slope = {slope_est[key]:.3f} m (CI: {cis[key][0]:.4f} – {cis[key][1]:.4f})")
         except Exception as e:
             print(f'Error processing {key}: {e}')
             print(f"Setting default slope for {key} to {default_slope} due to error.")
