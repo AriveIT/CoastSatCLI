@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import json
+
 from datetime import datetime
 import pytz
 
@@ -49,9 +51,23 @@ class TimeSeriesOptions:
     save_monthly_plots: bool = True # save plot for each transect with one point per month
 
 
+def print_options():
+    print(ImageryOptions())
+    print(AnalysisOptions())
+    print(SlopeOptions())
+    print(TideOptions())
+    print(PlottingOptions())
+    print(TimeSeriesOptions())
+
 @dataclass
 class Parameters:
     apply_tide_correction = True # False means skip slope estimation and tide correction
+    
+    # How much to put in log file
+    # "none" = nothing - everything printed to terminal. Note: this is a string, not a None
+    # "params" = parameters and options, other output printed to terminal
+    # "all" = everything saved in log file
+    logging_level = "params"
 
     #####################
     # Initialization
@@ -86,12 +102,12 @@ class Parameters:
     # Analysis
     #####################
     transect_settings = {
-        "along_dist": 25, # how far a point can be orthogonally to transect line
+        "along_dist": 35, # how far a point can be orthogonally to transect line
         "past_dist": 800, # distance a shoreline points can be past end of transect and be counted as an intersection
         "min_points": 3, # minimum number of points to calculate an intersections
         "max_std": 15, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
         "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
-        "min_chainage": -100, # furthest landward of the transect origin that an intersection is accepted
+        "min_chainage": -150, # furthest landward of the transect origin that an intersection is accepted
         
         # method of dealing with transect/shorelines with large dispersion ('auto', 'nan', 'max')
         # nan = set values to nan
@@ -106,9 +122,9 @@ class Parameters:
         "auto_prc": 0.1,
         'min_prc': 15, # what percentile to take in "min" 
 
-        "cluster_intersection_selection": False, # use clustering intersection algorithm
+        "cluster_intersection_selection": True, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": ["transect_076"], # plot all intersections for transects with these keys
+        "transects_to_plot": ["transect_025", "transect_050", "transect_076"], # plot all intersections for transects with these keys
     }
 
     outlier_settings = {
@@ -156,3 +172,18 @@ class Parameters:
     # if None, then puts everything in output folder
     # Intended for putting outputs of many sites in one place, for easier webmap creation
     alternate_trend_plot_dir = None
+
+    # print all variables in class
+    # written so that it doesn't need updating every time parameters is tweaked
+    def print_params(self):
+        atts = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
+        
+        for att in atts:
+            val = getattr(self, att)
+
+            # print(type(val), type(val) == Dict)
+            if type(val) == dict:
+                print(f"{att}: ", end="")
+                print(json.dumps(val, indent=4))
+            else:
+                print(f"{att}: {getattr(self, att)}")
