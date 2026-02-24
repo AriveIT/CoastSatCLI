@@ -737,6 +737,7 @@ def identify_outliers(chainage, dates, cross_change, debug=False):
     # when an outlier is found, remove it and restart
     # repeat until no more outliers are found in the time-series
     done = False
+    k = 0
     while not done:
 
         # if all but last point has been removed, throw that one away too
@@ -745,7 +746,10 @@ def identify_outliers(chainage, dates, cross_change, debug=False):
             dates_temp.pop(k)
             break
 
-        for k in range(len(chainage_temp)):
+        k -= 1
+        while k < len(chainage_temp) - 1:
+            k += 1
+            
             # check if the first point is an outlier
             if k == 0:
                 # difference between 1st and 2nd point in the time-series
