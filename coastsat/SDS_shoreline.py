@@ -42,7 +42,7 @@ from coastsat import SDS_tools, SDS_preprocess
 
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
 # Main function for batch shoreline detection
-def extract_shorelines(metadata, settings):
+def extract_shorelines(metadata, settings, print_errors=False):
     """
     Main function to extract shorelines from satellite images
     """
@@ -100,10 +100,15 @@ def extract_shorelines(metadata, settings):
         settings['min_length_sl'] = 200 if satname == 'L7' else default_min_length_sl
 
         last_pct = -1
+        cloud_skipped = 0
+        error_skipped = 0
+        skip_skipped = 0
+        cached = 0
+        computed = 0
         for i in range(len(filenames)):
             pct = int(((i + 1) / len(filenames)) * 100)
             if pct != last_pct:
-                print(f"{satname}: {pct}%", flush=True)
+                print(f"\r{satname}: {pct}%", flush=True, end="")
                 last_pct = pct
 
             fn = SDS_tools.get_filenames(filenames[i], filepath, satname)
@@ -111,7 +116,8 @@ def extract_shorelines(metadata, settings):
                 im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = SDS_preprocess.preprocess_single(
                     fn, satname, settings['cloud_mask_issue'], settings['pan_off'], settings['s2cloudless_prob'])
             except Exception as e:
-                print(f'Could not map shoreline for this image: {filenames[i]}, reason: {e}')
+                if print_errors: print(f'\nCould not preprocess this image: {filenames[i]}, reason: {e}')
+                error_skipped += 1
                 continue
 
             image_epsg = metadata[satname]['epsg'][i]
@@ -119,20 +125,22 @@ def extract_shorelines(metadata, settings):
             cloud_cover_combined = np.divide(sum(sum(cloud_mask.astype(int))),
                                              (cloud_mask.shape[0]*cloud_mask.shape[1]))
             if cloud_cover_combined > 0.99:
+                cloud_skipped += 1
                 continue
             cloud_mask_adv = np.logical_xor(cloud_mask, im_nodata)
             cloud_cover = np.divide(sum(sum(cloud_mask_adv.astype(int))),
                                     (sum(sum((~im_nodata).astype(int)))))
             if cloud_cover > settings['cloud_thresh']:
+                cloud_skipped += 1
                 continue
 
             buffer_key = (tuple(cloud_mask.shape), tuple(np.round(georef, 6)))
 
             if buffer_key in buffer_cache:
-                print("Buffer (cached)")
+                cached += 1
                 im_ref_buffer = buffer_cache[buffer_key]
             else:
-                print("Buffer (computed)")
+                computed += 1
                 im_ref_buffer = create_shoreline_buffer(cloud_mask.shape, georef, image_epsg, settings)
                 buffer_cache[buffer_key] = im_ref_buffer
 
@@ -145,6 +153,7 @@ def extract_shorelines(metadata, settings):
                                                                   im_ref_buffer, image_epsg, georef,
                                                                   settings, date, satname)
                 if skip_image:
+                    skip_skipped += 1
                     continue
             else:
                 try:
@@ -154,7 +163,8 @@ def extract_shorelines(metadata, settings):
                     else:
                         contours_mwi, t_mndwi = find_wl_contours2(im_ms, im_labels, cloud_mask, im_ref_buffer)
                 except Exception as e:
-                    print(f'Could not map shoreline for this image: {filenames[i]}, reason: {e}')
+                    if print_errors: print(f'\nCould not map shoreline for this image: {filenames[i]}, reason: {e}')
+                    error_skipped += 1
                     continue
 
             shoreline = process_shoreline(contours_mwi, cloud_mask_adv, im_nodata,
@@ -192,6 +202,11 @@ def extract_shorelines(metadata, settings):
             'MNDWI_threshold': output_t_mndwi,
             'transect_origin_classes': output_transect_origin_classes
         }
+
+        print()
+        print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, \
+                {error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
+        print(f"Shoreline buffer computed {computed} times and cached {cached} times")
 
     if plt.get_fignums():
         plt.close()
