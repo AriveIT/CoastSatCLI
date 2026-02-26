@@ -16,7 +16,7 @@ class ImageryOptions:
     cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = True # skip saving jpg altogether (intended for when rerunning site)
+    skip_jpg: bool = False # skip saving jpg altogether (intended for when rerunning site)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
@@ -103,7 +103,7 @@ class Parameters:
     #####################
     transect_settings = {
         "along_dist": 35, # how far a point can be orthogonally to transect line
-        "past_dist": 800, # distance a shoreline points can be past end of transect and be counted as an intersection
+        "past_dist": 300, # distance a shoreline points can be past end of transect and be counted as an intersection
         "min_points": 3, # minimum number of points to calculate an intersections
         "max_std": 15, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
         "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
