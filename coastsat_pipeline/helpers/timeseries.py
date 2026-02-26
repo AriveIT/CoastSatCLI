@@ -55,7 +55,10 @@ def run_time_series_post_processing(
             processed += 1
 
             if settings.get("save_figure", False) and options.save_seasonal_plots:
-                _plot_seasonal_average(key, valid_dates, valid_chainage, seasonal_path)
+                try:
+                    _plot_seasonal_average(key, valid_dates, valid_chainage, seasonal_path)
+                except Exception as e:
+                    print(e)
             if settings.get("save_figure", False) and options.save_monthly_plots:
                 _plot_monthly_average(key, valid_dates, valid_chainage, monthly_path)
 
@@ -99,6 +102,8 @@ def _write_time_series_csv(transects, cross_distance, dates, settings):
 def _plot_seasonal_average(key, dates, chainage, trend_plot_dir):
     """Plot seasonal averages and seasonal trends for a transect."""
     dict_seas, dates_seas, chainage_seas, list_seas = SDS_transects.seasonal_average(dates.tolist(), chainage.tolist())
+    if len(dates_seas) == 0:
+        raise Exception("Not enough data for seasonal trends plot")
     overall_trend, overall_fit = SDS_transects.calculate_trend(dates_seas, chainage_seas)
     season_colors = {"DJF": "C3", "MAM": "C1", "JJA": "C2", "SON": "C0"}
 
