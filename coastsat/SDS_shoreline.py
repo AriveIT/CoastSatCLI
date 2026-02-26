@@ -204,8 +204,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
         }
 
         print()
-        print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, \
-                {error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
+        print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover,"
+                "{error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
         print(f"Shoreline buffer computed {computed} times and cached {cached} times")
 
     if plt.get_fignums():

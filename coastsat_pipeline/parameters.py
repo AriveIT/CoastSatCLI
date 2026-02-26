@@ -114,7 +114,7 @@ class Parameters:
         # max = use maximum intersection
         # auto = if more than auto_prc% of intersections for a given transect (across shorelines) have std>max_std, use maximum intersection
         # min = take the shore_prc th percentile
-        "multiple_inter": "auto",
+        "multiple_inter": "nan",
 
         # percentage to use in 'auto' mode to blend between 'nan' and 'max'
         # auto_prc = 0.0 --> max
