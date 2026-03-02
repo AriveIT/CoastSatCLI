@@ -204,8 +204,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
         }
 
         print()
-        print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover,"
-                "{error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
+        print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
+                f"{error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
         print(f"Shoreline buffer computed {computed} times and cached {cached} times")
 
     if plt.get_fignums():
@@ -917,92 +917,8 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
         # if try fails, just add nan into the shoreline vector so the next parts can still run
         sl_pix = np.array([[np.nan, np.nan],[np.nan, np.nan]])
 
-    if plt.get_fignums():
-        # get open figure if it exists
-        fig = plt.gcf()
-        ax1 = fig.axes[0]
-        ax2 = fig.axes[1]
-        ax3 = fig.axes[2]
-        ax4 = fig.axes[3]     
-
-    else:
-        # else create a new figure
-        fig = plt.figure()
-        fig.set_size_inches([18, 9])
-        if settings['check_detection']:
-            try:
-                mng = plt.get_current_fig_manager()
-                mng.window.showMaximized()
-            except Exception:
-                pass
-
-        # according to the image shape, decide whether it is better to have the images
-        # in vertical subplots or horizontal subplots
-        if im_RGB.shape[1] > 2.5*im_RGB.shape[0]:
-            # horizontal subplots
-            gs = gridspec.GridSpec(4, 1,height_ratios=[0.1,1,1,1])
-            gs.update(bottom=0.03, top=0.97, left=0.03, right=0.97)
-            ax1 = fig.add_subplot(gs[1])
-            ax2 = fig.add_subplot(gs[2], sharex=ax1, sharey=ax1)
-            ax3 = fig.add_subplot(gs[3], sharex=ax1, sharey=ax1)
-            ax4 = fig.add_subplot(gs[0])
-        else:
-            # vertical subplots
-            gs = gridspec.GridSpec(2, 3,height_ratios=[1,8],hspace=0.1)
-            gs.update(bottom=0.03, top=0.99, left=0.03, right=0.97)
-            ax1 = fig.add_subplot(gs[1,0])
-            ax2 = fig.add_subplot(gs[1,1], sharex=ax1, sharey=ax1)
-            ax3 = fig.add_subplot(gs[1,2], sharex=ax1, sharey=ax1)
-            ax4 = fig.add_subplot(gs[0,:])
-            
-    # add timeline on top
-    date_start = datetime.strptime(settings['inputs']['dates'][0],'%Y-%m-%d')
-    date_end = datetime.strptime(settings['inputs']['dates'][1],'%Y-%m-%d')
-    ax4.axis('off')
-    ax4.axhline(y=0,ls='-',lw=2,c='k')
-    ax4.set(xlim=[date_start-timedelta(days=30),date_end+timedelta(days=30)],ylim=[-0.1,0.1])
-    for k in range(date_start.year,date_end.year+1):
-        ax4.plot(datetime(k,1,1),0,'ko',ms=6)
-        ax4.text(datetime(k,1,1),-0.05,str(k)[-2:],ha='center',va='center')
-    ax4.plot(datetime.strptime(date[:10],'%Y-%m-%d'),0,'rs',ms=10,mec='k')
-    # change the color of nans to either black (0.0) or white (1.0) or somewhere in between
-    nan_color = 1.0
-    im_RGB = np.where(np.isnan(im_RGB), nan_color, im_RGB)
-    im_class = np.where(np.isnan(im_class), 1.0, im_class)
-
-    # create image 1 (RGB)
-    ax1.imshow(im_RGB)
-    ax1.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
-    ax1.axis('off')
-    ax1.set_title(sitename, fontweight='bold', fontsize=12)
-
-    # create image 2 (classification)
-    ax2.imshow(im_class)
-    ax2.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
-    ax2.axis('off')
-    orange_patch = mpatches.Patch(color=colours[0,:], label='sand')
-    white_patch = mpatches.Patch(color=colours[1,:], label='whitewater')
-    blue_patch = mpatches.Patch(color=colours[2,:], label='water')
-    black_line = mlines.Line2D([],[],color='k',linestyle='-', label='shoreline')
-    ax2.legend(handles=[orange_patch,white_patch,blue_patch, black_line],
-               bbox_to_anchor=(1, 0.5), fontsize=10)
-    ax2.set_title(date, fontweight='bold', fontsize=12)
-
-    # create image 3 (MNDWI)
-    ax3.imshow(im_mwi, cmap='bwr')
-    ax3.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
-    ax3.axis('off')
-    ax3.set_title(satname, fontweight='bold', fontsize=12)
-    
-    # additional options
-    ax1.set_anchor('W')
-    ax2.set_anchor('C')
-    ax3.set_anchor('E')
-    
-    # add colorbar for MNDWI
-    # cb = plt.colorbar(mwi_plot)
-    # cb.ax.tick_params(labelsize=10)
-    # cb.set_label('MNDWI values')
+    fig = plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, colours, settings)
+    ax1 = fig.axes[0]
 
     # if check_detection is True, let user manually accept/reject the images
     skip_image = False
@@ -1058,6 +974,128 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
             ax.clear()
 
     return skip_image
+
+def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, colours, settings, plot_extra=False):
+    """
+    plots three given images together with shorelines
+    plot_extra: plots images again beside without shoreline (to see values that shoreline covers)
+        only implemented for vertical format
+    """
+    if plt.get_fignums():
+        # get open figure if it exists
+        fig = plt.gcf()
+        ax1 = fig.axes[0]
+        ax2 = fig.axes[1]
+        ax3 = fig.axes[2]
+        ax4 = fig.axes[3]     
+
+    else:
+        # else create a new figure
+        fig = plt.figure()
+        fig.set_size_inches([18, 9])
+        if settings['check_detection']:
+            try:
+                mng = plt.get_current_fig_manager()
+                mng.window.showMaximized()
+            except Exception:
+                pass
+
+        # according to the image shape, decide whether it is better to have the images
+        # in vertical subplots or horizontal subplots
+        if im_RGB.shape[1] > 2.5*im_RGB.shape[0]:
+            # horizontal subplots
+            gs = gridspec.GridSpec(4, 1,height_ratios=[0.1,1,1,1])
+            gs.update(bottom=0.03, top=0.97, left=0.03, right=0.97)
+            ax1 = fig.add_subplot(gs[1])
+            ax2 = fig.add_subplot(gs[2], sharex=ax1, sharey=ax1)
+            ax3 = fig.add_subplot(gs[3], sharex=ax1, sharey=ax1)
+            ax4 = fig.add_subplot(gs[0])
+
+
+        else:
+            # vertical subplots
+            if plot_extra:
+                gs = gridspec.GridSpec(2, 6,height_ratios=[1,8],hspace=0.1)
+                gs.update(bottom=0.03, top=0.99, left=0.03, right=0.97)
+                ax1 = fig.add_subplot(gs[1,0])
+                ax2 = fig.add_subplot(gs[1,2], sharex=ax1, sharey=ax1)
+                ax3 = fig.add_subplot(gs[1,4], sharex=ax1, sharey=ax1)
+                ax5 = fig.add_subplot(gs[1,1], sharex=ax1, sharey=ax1)
+                ax6 = fig.add_subplot(gs[1,3], sharex=ax1, sharey=ax1)
+                ax7 = fig.add_subplot(gs[1,5], sharex=ax1, sharey=ax1)
+            else:
+                gs = gridspec.GridSpec(2, 3,height_ratios=[1,8],hspace=0.1)
+                gs.update(bottom=0.03, top=0.99, left=0.03, right=0.97)
+                ax1 = fig.add_subplot(gs[1,0])
+                ax2 = fig.add_subplot(gs[1,1], sharex=ax1, sharey=ax1)
+                ax3 = fig.add_subplot(gs[1,2], sharex=ax1, sharey=ax1)
+
+            ax4 = fig.add_subplot(gs[0,:])
+            
+    # add timeline on top
+    date_start = datetime.strptime(settings['inputs']['dates'][0],'%Y-%m-%d')
+    date_end = datetime.strptime(settings['inputs']['dates'][1],'%Y-%m-%d')
+    ax4.axis('off')
+    ax4.axhline(y=0,ls='-',lw=2,c='k')
+    ax4.set(xlim=[date_start-timedelta(days=30),date_end+timedelta(days=30)],ylim=[-0.1,0.1])
+    for k in range(date_start.year,date_end.year+1):
+        ax4.plot(datetime(k,1,1),0,'ko',ms=6)
+        ax4.text(datetime(k,1,1),-0.05,str(k)[-2:],ha='center',va='center')
+    ax4.plot(datetime.strptime(date[:10],'%Y-%m-%d'),0,'rs',ms=10,mec='k')
+    # change the color of nans to either black (0.0) or white (1.0) or somewhere in between
+    nan_color = 1.0
+    im_RGB = np.where(np.isnan(im_RGB), nan_color, im_RGB)
+    im_class = np.where(np.isnan(im_class), 1.0, im_class)
+
+    # create image 1 (RGB)
+    ax1.imshow(im_RGB)
+    ax1.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
+    ax1.axis('off')
+    ax1.set_title(sitename, fontweight='bold', fontsize=12)
+
+    # create image 2 (classification)
+    ax2.imshow(im_class)
+    ax2.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
+    ax2.axis('off')
+
+    if not plot_extra:
+        orange_patch = mpatches.Patch(color=colours[0,:], label='sand')
+        white_patch = mpatches.Patch(color=colours[1,:], label='whitewater')
+        blue_patch = mpatches.Patch(color=colours[2,:], label='water')
+        black_line = mlines.Line2D([],[],color='k',linestyle='-', label='shoreline')
+        ax2.legend(handles=[orange_patch,white_patch,blue_patch, black_line],
+                bbox_to_anchor=(1, 0.5), fontsize=10)
+    ax2.set_title(date, fontweight='bold', fontsize=12)
+
+    # create image 3 (MNDWI)
+    ax3.imshow(im_mwi, cmap='bwr')
+    ax3.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
+    ax3.axis('off')
+    ax3.set_title(satname, fontweight='bold', fontsize=12)
+    
+    
+    # additional options
+    ax1.set_anchor('W')
+    ax2.set_anchor('C')
+    ax3.set_anchor('E')
+    
+    # add colorbar for MNDWI
+    # cb = plt.colorbar(mwi_plot)
+    # cb.ax.tick_params(labelsize=10)
+    # cb.set_label('MNDWI values')
+
+    if plot_extra:
+        ax5.imshow(im_RGB)
+        ax5.axis('off')
+
+        ax6.imshow(im_class)
+        ax6.axis('off')
+
+        ax7.imshow(im_mwi, cmap='bwr')
+        ax7.axis('off')
+
+
+    return fig
 
 def adjust_detection(im_ms, cloud_mask, im_nodata, im_labels, im_ref_buffer, image_epsg, georef,
                      settings, date, satname):
