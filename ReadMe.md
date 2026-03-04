@@ -24,7 +24,7 @@ Command-line and GUI tools for running CoastSat end to end for the Canadian Coas
 
 1) Clone the repo (git):
 ```bash
-git clone https://github.com/BenJTowers/CoastSatCLI.git
+git clone https://github.com/AriveIT/CoastSatCLI.git
 cd CoastSatCLI
 ```
 
@@ -70,7 +70,7 @@ These are the essential stages the CoastSat tooling runs through for each site:
 ```bash
 python -m cli.gui_init
 ```
-   - In the GUI, select a base folder and sitename(s), pick a shoreline file, choose AOI KML(s) (single or batch), pick tide method (FES config vs tide CSV with beach slope), optional tide filtering, let EPSG auto-detect or override it, and adjust transect spacing/length/offset if needed. The GUI writes `settings.json` and scaffolds the site; you can also check “run now” to start analysis immediately (choose engine `pipeline`).
+   - In the GUI, select a base folder and sitename(s), pick a shoreline file, choose AOI KML(s) (single or batch, generated with [geojson.io](https://geojson.io/)), pick tide method (FES config vs tide CSV with beach slope), optional tide filtering, let EPSG auto-detect or override it, and adjust transect spacing/length/offset if needed. The GUI writes `settings.json` and scaffolds the site; you can also check “run now” to start analysis immediately (choose engine `pipeline`).
 2) Run the pipeline via GUI:
 ```bash
 python -m coastsat_pipeline.gui
@@ -96,6 +96,19 @@ Add `--engine pipeline` to drive the new pipeline through the legacy CLI, or omi
 ### Reruns and inspection (either path)
 - Rerun with updated transects/ref shorelines: `python cli/CoastsatCLI.py site-rerun --config path/to/settings.json`.
 - Summarize outputs: `python cli/CoastsatCLI.py show --config path/to/settings.json`.
+
+### Checkpoints
+At the beginning of each stage, the current context is saved in <stagename>.pkl in the checkpoints folder. The pipeline can be run at the beginning of a stage using these checkpoint files.
+
+1) Run from specific stage
+```bash
+python run_from_cp.py <stagename>
+```
+
+2) Run from last started stage
+```bash
+python run_from_cp.py
+```
 
 ## Repository map
 - `coastsat_pipeline/` - stage registry, runner, GUI.
