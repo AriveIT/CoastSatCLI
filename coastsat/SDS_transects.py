@@ -302,6 +302,8 @@ def compute_intersection_QC(output, transects, settings):
         prc_intersect = np.zeros(len(shorelines))
         n_intersect = np.zeros(len(shorelines))
 
+        # n_cluster = np.zeros(len(shorelines))
+
         ema = np.nan # exponential moving average
         alpha = 0.1 # how much to weight most recent centroid
         bad_intersection_count = 0
@@ -338,6 +340,8 @@ def compute_intersection_QC(output, transects, settings):
                 min_intersect[i] = np.nan
                 prc_intersect[i] = np.nan
                 n_intersect[i] = np.nan
+
+                # n_cluster[i] = np.nan
             else:
                 # change of base to shore-normal coordinate system
                 xy_close = np.array([sl[idx_close,0],sl[idx_close,1]]) - np.tile(np.array([[X0],
@@ -362,6 +366,8 @@ def compute_intersection_QC(output, transects, settings):
                         min_intersect[i] = np.nan
                         prc_intersect[i] = np.nan
                         n_intersect[i] = np.nan
+
+                        # n_cluster[i] = np.nan
                         bad_intersection_count += 1
                         continue
                     
@@ -385,7 +391,6 @@ def compute_intersection_QC(output, transects, settings):
                             transect_class,
                             ema,
                             settings['transect_plot_dir'])
-                        pass
 
                     intersections = clusters[c_idx]
                 else:
@@ -398,6 +403,8 @@ def compute_intersection_QC(output, transects, settings):
                 min_intersect[i] = np.nanmin(intersections)
                 prc_intersect[i] = np.nanpercentile(intersections, settings['min_prc'])
                 n_intersect[i] = np.sum(~np.isnan(intersections))  # count only non-nan values
+
+                # n_cluster[i] = len(clusters)
 
                 
         # quality control the intersections using dispersion metrics (std and range)
@@ -430,6 +437,7 @@ def compute_intersection_QC(output, transects, settings):
             
         elif settings['multiple_inter'] == 'nan':
             med_intersect[~idx_good] = np.nan
+            # n_cluster[~idx_good] = np.nan
             prc_over = 0
 
         elif settings['multiple_inter'] == 'min':
@@ -441,8 +449,11 @@ def compute_intersection_QC(output, transects, settings):
         else:
             raise Exception('the multiple_inter parameter can only be: nan, max or auto')
 
+        
+
         # store in dict
         cross_dist[key] = med_intersect
+        # plot_n_clusters(cross_dist[key], output['dates'], n_cluster, key, settings['transect_plot_dir'])
 
         # plot for troubleshooting
         # if settings['plot_fig']:
@@ -602,6 +613,31 @@ def get_plot_range(p0, p1, buffer_ratio=1.5):
     y_lim = (y_min - buffer_ratio * y_range, y_max + buffer_ratio * y_range)
 
     return x_lim, y_lim
+
+def plot_n_clusters(chainage, dates, n_clusters, transect_key, dir):
+
+    # preprocessing
+    idx_not_nan = np.where(~np.isnan(n_clusters))[0]
+    idx1 = np.where(n_clusters == 1)[0]
+    idx2 = np.where(n_clusters == 2)[0]
+    pct_2_cluster = (len(idx2) / len(idx_not_nan)) * 100
+
+    # prep fig
+    fig,ax=plt.subplots(1,1,figsize=[12,6], sharex=True)
+    fig.set_tight_layout(True)
+    ax.grid(linestyle=':', color='0.5')
+    ax.set(ylabel='distance [m]',
+                title= f'{transect_key} time-series: {pct_2_cluster:.3f}% 2 cluster')
+    
+    # plot the data points
+    ax.plot([dates[i] for i in idx_not_nan], chainage[idx_not_nan], 'C0-')
+    ax.plot([dates[i] for i in idx1], chainage[idx1], 'C2o', ms=4, mec='k', mew=0.7,label='1 cluster')
+    ax.plot([dates[i] for i in idx2], chainage[idx2], 'C3o', ms=4, mec='k', mew=0.7,label='2 cluster')
+    ax.legend(ncol=2,loc='upper right')
+    
+    # save
+    os.makedirs(f"{dir}\\n_clusters", exist_ok=True)
+    fig.savefig(f"{dir}\\n_clusters\\{transect_key}_n_clusters.png")
 
 ###################################################################################################
 # DESPIKING/OUTLIER REMOVAL
