@@ -13,10 +13,10 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = True # plots all extracted shorelines in different colours
-    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = True # skip saving jpg altogether (intended for when rerunning site)
+    skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
@@ -47,8 +47,9 @@ class PlottingOptions: # transects_colored_by_trend (currently transects aren't 
 class TimeSeriesOptions:
     """Tuning switches for time-series post-processing outputs."""
     write_csv: bool = False # would overwrite file made earlier in pipeline...
-    save_seasonal_plots: bool = True # save plot for each transect with one point per season
-    save_monthly_plots: bool = True # save plot for each transect with one point per month
+    save_seasonal_plots: bool = False # save plot for each transect with one point per season
+    save_monthly_plots: bool = False # save plot for each transect with one point per month
+    save_ma_plots: bool = True # save plot with individual observations and a 6month moving average
 
 
 def print_options():
@@ -75,7 +76,7 @@ class Parameters:
     # Note: these parameters only affect downloads. Analysis is unaffected (it is performed on anything already downloaded)
     download_filters = {
         'dates': ['1984-01-01', '2025-01-01'], #["1984-01-01", "2025-01-01"], # range of dates of aquisitions to be downloaded
-        'sat_list': ["L5", "L7", "L8", "L9"], #["L5", "L7", "L8", "L9"], # satellite missions to download images from
+        'sat_list': ["L5", "L7", "L8", "L9"], # satellite missions to download images from
         # 'excluded_epsg_codes': ['32609'], # exclude images with given epsg codes
         # 'LandsatWRS': '055022', # specify a Landsat tile (WRS path/row)
         # 'S2tile': '09UVA', # specifies an S2 tile
@@ -95,7 +96,7 @@ class Parameters:
         "sand_color": "default", # classification model: 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
         "pan_off": False, # True to switch pansharpening off for Landsat 7/8/9 imagery
         "s2cloudless_prob": 60, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
-        "max_dist_ref" : 100, # maximum distance from the reference shoreline in meters
+        "max_dist_ref" : 250, # maximum distance from the reference shoreline in meters
     }
 
     #####################
@@ -103,7 +104,7 @@ class Parameters:
     #####################
     transect_settings = {
         "along_dist": 35, # how far a point can be orthogonally to transect line
-        "past_dist": 800, # distance a shoreline points can be past end of transect and be counted as an intersection
+        "past_dist": 300, # distance a shoreline points can be past end of transect and be counted as an intersection
         "min_points": 3, # minimum number of points to calculate an intersections
         "max_std": 15, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
         "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
@@ -124,7 +125,7 @@ class Parameters:
 
         "cluster_intersection_selection": True, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": ["transect_025", "transect_050", "transect_076"], # plot all intersections for transects with these keys
+        "transects_to_plot": ["transect_047"], # plot all intersections for transects with these keys
     }
 
     outlier_settings = {
@@ -173,7 +174,7 @@ class Parameters:
     # Intended for putting outputs of many sites in one place, for easier webmap creation
     alternate_trend_plot_dir = None
 
-    # print all variables in class
+    # print all variables in class in alphabetical order
     # written so that it doesn't need updating every time parameters is tweaked
     def print_params(self):
         atts = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
@@ -181,7 +182,6 @@ class Parameters:
         for att in atts:
             val = getattr(self, att)
 
-            # print(type(val), type(val) == Dict)
             if type(val) == dict:
                 print(f"{att}: ", end="")
                 print(json.dumps(val, indent=4))
