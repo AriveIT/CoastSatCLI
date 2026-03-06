@@ -63,6 +63,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
     buffer_cache = {}
 
     transect_origins = np.array(list(SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"]).values()))[:,0,:]
+    cloud_covers = {satname: [] for satname in metadata.keys()}
 
     for satname in metadata.keys():
 
@@ -130,6 +131,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
             cloud_mask_adv = np.logical_xor(cloud_mask, im_nodata)
             cloud_cover = np.divide(sum(sum(cloud_mask_adv.astype(int))),
                                     (sum(sum((~im_nodata).astype(int)))))
+            
+            cloud_covers[satname].append(cloud_cover)
             if cloud_cover > settings['cloud_thresh']:
                 cloud_skipped += 1
                 continue
@@ -208,6 +211,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 f"{error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
         print(f"Shoreline buffer computed {computed} times and cached {cached} times")
 
+    plot_cloud_cover_hist(cloud_covers, settings)
+
     if plt.get_fignums():
         plt.close()
 
@@ -219,6 +224,31 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
     return output
 
+def plot_cloud_cover_hist(cloud_covers, settings):
+    
+    # prepare plot
+    fig, ax = plt.subplots(figsize=(12, 8), tight_layout=True)
+    ax.set_title(f"Cloud cover for each mission ({settings['inputs']['sitename']})", fontsize=14)
+    ax.set_xlabel("Cloud Cover Proportion")
+    ax.set_ylabel("Count")
+
+    # plot values and threshold line
+    counts, edges, bars = ax.hist(
+        list(cloud_covers.values()),
+        bins=np.linspace(0, 1, 21),
+        histtype='barstacked',
+        label=list(cloud_covers.keys())
+    )
+    ax.axvline(settings["cloud_thresh"], color='k', ls="--")
+
+    # plot values above each bar
+    ax.bar_label(bars[-1])
+    ax.legend()
+
+    # save plot
+    output_path = os.path.join(settings["inputs"]["filepath"], "cloud_cover_hist.jpg")
+    fig.savefig(output_path, dpi=300)
+    plt.close(fig)
 
 def get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask, settings, georef, filename, image_epsg):
     transect_origins_pxl = np.round(SDS_tools.convert_world2pix(SDS_tools.convert_epsg(transect_origins,
