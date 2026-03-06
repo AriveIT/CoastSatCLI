@@ -174,7 +174,7 @@ def preprocess_single(fn, satname, cloud_mask_issue, pan_off, s2cloudless_prob=4
             bands = [data.GetRasterBand(k + 1).ReadAsArray() for k in range(data.RasterCount)]
             im_pan = bands[0]
            
-            # pansharpen Green, Blue, NIR for Landsat 7
+            # pansharpen Green, Red, NIR for Landsat 7
             if satname == 'L7':
                 try:
                     im_ms_ps = pansharpen(im_ms[:,:,[1,2,3]], im_pan, cloud_mask)
