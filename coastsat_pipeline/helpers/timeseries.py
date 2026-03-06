@@ -127,7 +127,7 @@ def _plot_ma(key, dates, chainage, fit, trend, trend_plot_dir):
     ax.plot(dates, fit, "--", color="b", label=f"trend {trend:.1f} m/year")
 
     ax.legend(loc="lower left", ncol=6, markerscale=1.5, frameon=True, edgecolor="k", columnspacing=1)
-    fig.savefig(os.path.join(trend_plot_dir, f"{key}_seasonal_average.jpg"))
+    fig.savefig(os.path.join(trend_plot_dir, f"{key}_ma.jpg"))
     plt.close(fig)
 
 def _plot_seasonal_average(key, dates, chainage, trend_plot_dir):
