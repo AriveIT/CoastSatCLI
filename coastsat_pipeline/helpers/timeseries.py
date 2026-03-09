@@ -28,11 +28,12 @@ def run_time_series_post_processing(
     settings: Dict[str, Any],
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],
-    trend_plot_dir: str | None,
+    min_chainage_size: int,
+    trend_plot_dir: str | None, # alternate trend plot path
     options: TimeSeriesOptions | None = None,
 ) -> TimeSeriesResult:
     options = options or TimeSeriesOptions()
-    (seasonal_path, monthly_path) = _get_full_plot_path(trend_plot_dir, settings)
+    (seasonal_path, monthly_path, ma_path) = _get_full_plot_path(trend_plot_dir, settings)
     cross_distance = {key: np.asarray(series, dtype=float).copy() for key, series in cross_distance_tidally_corrected.items()}
     dates = output["dates"]
 
@@ -50,7 +51,7 @@ def run_time_series_post_processing(
         valid_dates = np.array(dates)[idx_valid]
         valid_chainage = series[idx_valid]
 
-        if valid_chainage.size > 1:
+        if valid_chainage.size > min_chainage_size:
             trend, fitted = SDS_transects.calculate_trend(valid_dates, valid_chainage)
             processed += 1
 
@@ -61,6 +62,8 @@ def run_time_series_post_processing(
                     print(e)
             if settings.get("save_figure", False) and options.save_monthly_plots:
                 _plot_monthly_average(key, valid_dates, valid_chainage, monthly_path)
+            if settings.get("save_figure", False) and options.save_ma_plots:
+                _plot_ma(key, valid_dates, valid_chainage, fitted, trend, ma_path)
 
         else:
             trend = np.nan
@@ -77,16 +80,20 @@ def _get_full_plot_path(trend_plot_dir, settings):
     if trend_plot_dir:
         os.makedirs(os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"]), exist_ok=True)
         os.makedirs(os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"]), exist_ok=True)
+        os.makedirs(os.path.join(trend_plot_dir, "ma_plots", settings["inputs"]["sitename"]), exist_ok=True)
         return (
             os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"]),
-            os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"])
+            os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"]),
+            os.path.join(trend_plot_dir, "ma_plots", settings["inputs"]["sitename"])
         )
     else:
         os.makedirs(os.path.join(settings["inputs"]["filepath"], "seasonal_plots"), exist_ok=True)
         os.makedirs(os.path.join(settings["inputs"]["filepath"], "monthly_plots"), exist_ok=True)
+        os.makedirs(os.path.join(settings["inputs"]["filepath"], "ma_plots"), exist_ok=True)
         return (
             os.path.join(settings["inputs"]["filepath"], "seasonal_plots"),
-            os.path.join(settings["inputs"]["filepath"], "monthly_plots")
+            os.path.join(settings["inputs"]["filepath"], "monthly_plots"),
+            os.path.join(settings["inputs"]["filepath"], "ma_plots")
         )
 
 def _write_time_series_csv(transects, cross_distance, dates, settings):
@@ -98,6 +105,31 @@ def _write_time_series_csv(transects, cross_distance, dates, settings):
     fn = os.path.join(settings["inputs"]["filepath"], "transect_time_series.csv")
     df.to_csv(fn, sep=",")
 
+def _plot_ma(key, dates, chainage, fit, trend, trend_plot_dir):
+    # nans affect plot of ma, but not individual observations
+    not_nan = np.where(~np.isnan(chainage))[0]
+    not_nan_chainage = chainage[not_nan]
+    not_nan_dates = [dates[i] for i in not_nan]
+
+    # 6-month moving average for smoother seasonal visualization (independent of trend).
+    df_ma = pd.DataFrame({"date": pd.to_datetime(not_nan_dates), "value": not_nan_chainage}).sort_values("date")
+    ma = df_ma.set_index("date")["value"].rolling("180D", center=True).mean()
+
+    # prep fig
+    fig, ax = plt.subplots(1, 1, figsize=[14, 4], tight_layout=True)
+    ax.grid(which="major", linestyle=":", color="0.5")
+    ax.set_title(f"Time-series at {key}", x=0, ha="left")
+    ax.set(ylabel="distance [m]")
+
+    # plot points
+    if ma.notna().sum() > 1:
+        ax.plot(ma.index, ma.values, color="darkorange", lw=1.5, label="6-mo moving avg")
+    ax.plot(dates, chainage, "+", lw=1, color="k", mfc="w", ms=4, alpha=0.5, label="raw datapoints")
+    ax.plot(dates, fit, "--", color="b", label=f"trend {trend:.1f} m/year")
+
+    ax.legend(loc="lower left", ncol=6, markerscale=1.5, frameon=True, edgecolor="k", columnspacing=1)
+    fig.savefig(os.path.join(trend_plot_dir, f"{key}_ma.jpg"))
+    plt.close(fig)
 
 def _plot_seasonal_average(key, dates, chainage, trend_plot_dir):
     """Plot seasonal averages and seasonal trends for a transect."""

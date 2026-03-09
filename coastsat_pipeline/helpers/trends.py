@@ -11,6 +11,9 @@ import numpy as np
 from pyproj import CRS
 from shapely.geometry import MultiLineString
 
+import datetime
+import json
+
 logger = logging.getLogger(__name__)
 
 
@@ -24,15 +27,11 @@ class TransectTrend:
     trend: float
     slope: float
     geometry: MultiLineString
-    images_total: int
     images_used: int
-    coverage_pct: float
-    data_gap_pct: float
-    tide_filter_removed: float
-    tide_filter_total: float
     tide_filter_removed_pct: float
     plot_path: str
     slope_plot_path: str
+    ma_plot_path: str
 
 
 @dataclass
@@ -55,7 +54,7 @@ def compute_and_save_trends(
     Build per-transect trend summaries and export them as GeoJSON, mirroring the legacy Stage 08.
     """
     if not slope_est: slope_est = {}
-    records = _build_transect_trends(
+    records, geojson_metadata = _build_transect_trends(
         transects=transects,
         cross_distance_tidally_corrected=cross_distance_tidally_corrected,
         output=output,
@@ -64,7 +63,7 @@ def compute_and_save_trends(
         slope_est=slope_est,
         trend_plot_dir=trend_plot_dir,
     )
-    geojson_path = _export_trends_geojson(records, settings, trend_plot_dir)
+    geojson_path = _export_trends_geojson(records, settings, trend_plot_dir, geojson_metadata)
 
     logger.info("Saved %d transect trends to %s", len(records), geojson_path)
     return TrendExportResult(records=records, geojson_path=geojson_path, trend_dict=trend_dict)
@@ -81,12 +80,13 @@ def _build_transect_trends(
 ) -> List[TransectTrend]:
     total_images = len(output.get("dates", []))
     tide_stats = settings.get("tide_filter_stats", {})
-    filepath = _get_filepath(trend_plot_dir, settings)
+    seasonal_dir, ma_dir = _get_filepath(trend_plot_dir, settings)
     slope_dir = Path(settings["inputs"]["filepath"]) / "slope_estimation"
 
     records: List[TransectTrend] = []
     for key, geometry in transects.items():
-        seasonal_plot_path = os.path.join(filepath, f"{key}_seasonal_average.jpg")
+        seasonal_plot_path = os.path.join(seasonal_dir, f"{key}_seasonal_average.jpg")
+        ma_plot_path = os.path.join(ma_dir, f"{key}_ma.jpg")
         slope_energy_curve_path = str(slope_dir / f"2_energy_curve_{key}.jpg")
 
         cross = np.asarray(cross_distance_tidally_corrected.get(key, []), dtype=float)
@@ -104,27 +104,28 @@ def _build_transect_trends(
             geometry=MultiLineString([geometry]),
             trend=trend_dict.get(key, np.nan),
             slope=slope_est.get(key, None),
-            images_total=int(total_images),
             images_used=n_used,
-            coverage_pct=coverage_pct,
-            data_gap_pct=gap_pct,
-            tide_filter_removed=tide_removed,
-            tide_filter_total=tide_total,
             tide_filter_removed_pct=tide_removed_pct,
             plot_path=seasonal_plot_path,
             slope_plot_path=slope_energy_curve_path,
+            ma_plot_path=ma_plot_path
         )
         records.append(record)
 
+    geojson_metadata = _build_geojson_metadata(total_images, settings)
     logger.debug("Built trend summaries for %d transects", len(records))
-    return records
+    return records, geojson_metadata
 
 # returns relative path that points to the seasonal_plots directory
 def _get_filepath(trend_plot_dir, settings):
     if trend_plot_dir:
-        return os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"])
+        seasonal_dir = os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"])
+        ma_dir = os.path.join(trend_plot_dir, "ma_plots", settings["inputs"]["sitename"])
+        return seasonal_dir, ma_dir
     else:
-        return os.path.join(settings["inputs"]["filepath"], "seasonal_plots")
+        seasonal_dir = os.path.join(settings["inputs"]["filepath"], "seasonal_plots")
+        ma_dir = os.path.join(settings["inputs"]["filepath"], "ma_plots")
+        return seasonal_dir, ma_dir
 
 # where to save geojson
 def _get_geojson_path(trend_plot_dir, settings):
@@ -135,10 +136,29 @@ def _get_geojson_path(trend_plot_dir, settings):
     else:
         return Path(settings["inputs"]["filepath"])
 
-def _export_trends_geojson(records: List[TransectTrend], settings: Dict[str, Any], trend_plot_dir: str | None) -> Path:
+def _export_trends_geojson(records: List[TransectTrend], settings: Dict[str, Any], trend_plot_dir: str | None, geojson_metadata) -> Path:
     gdf_transects = gpd.GeoDataFrame([asdict(record) for record in records], crs=CRS(settings["output_epsg"]))
 
     filepath = _get_geojson_path(trend_plot_dir, settings)
     geojson_path = os.path.join(filepath, f"{settings['inputs']['sitename']}_transects_with_trends.geojson")
-    gdf_transects.to_file(geojson_path, driver="GeoJSON", encoding="utf-8")
+
+    geojson = json.loads(gdf_transects.to_json())
+    geojson["features"].insert(0, geojson_metadata)  # put it first
+
+    with open(geojson_path, "w") as f:
+        json.dump(geojson, f)
+
     return geojson_path
+
+def _build_geojson_metadata(total_images, settings):
+    return {
+        "type": "Feature",
+        "geometry": None,
+        "properties": {
+            "_is_metadata": True,
+            "run_date": str(datetime.datetime.now()),
+            "analysis_data_range": settings["inputs"]["dates"],
+            "missions": settings["inputs"]["sat_list"],
+            "total images": int(total_images)
+        }
+    }

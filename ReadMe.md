@@ -97,6 +97,9 @@ Add `--engine pipeline` to drive the new pipeline through the legacy CLI, or omi
 - Rerun with updated transects/ref shorelines: `python cli/CoastsatCLI.py site-rerun --config path/to/settings.json`.
 - Summarize outputs: `python cli/CoastsatCLI.py show --config path/to/settings.json`.
 
+### Parameters
+Certain parameters are exposed during site initialization through the GUI. All other parameters are available in `coastsat_pipeline/parameters.py`. These should be read through before running a site.
+
 ### Checkpoints
 At the beginning of each stage, the current context is saved in <stagename>.pkl in the checkpoints folder. The pipeline can be run at the beginning of a stage using these checkpoint files.
 
