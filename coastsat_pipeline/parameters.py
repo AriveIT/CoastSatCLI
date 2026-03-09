@@ -16,13 +16,13 @@ class ImageryOptions:
     cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = False # skip saving jpg altogether (intended for when rerunning site)
+    skip_jpg: bool = False # skip saving jpg altogether (saving jpg is not necessary for analysis)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
 class AnalysisOptions:
     plot_transects: bool = True # plots all extracted shorelines and all transects
-    plot_time_series: bool = True # saves time series of each transect (currently illegible for any reasonable number of transects)
+    plot_time_series: bool = False # saves time series of each transect (currently illegible for any reasonable number of transects)
     write_csv: bool = True # saves time series data to csv file (after outlier rejection)
 
 @dataclass
@@ -49,6 +49,7 @@ class TimeSeriesOptions:
     write_csv: bool = False # would overwrite file made earlier in pipeline...
     save_seasonal_plots: bool = True # save plot for each transect with one point per season
     save_monthly_plots: bool = True # save plot for each transect with one point per month
+    save_ma_plots: bool = True # save plot with individual observations and a 6month moving average
 
 
 def print_options():
@@ -84,7 +85,7 @@ class Parameters:
     }
 
     analysis_settings = {
-        "cloud_thresh": 0.5, # percentage of image that can be covered by cloud
+        "cloud_thresh": 0.1, # percentage of image that can be covered by cloud
         "dist_clouds": 300, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
         "check_detection": False, # if True, lets user manually accept/reject the mapped shorelines
         "adjust_detection": False, # lets user adjust the detected shorelines with a slide bar.
@@ -95,7 +96,7 @@ class Parameters:
         "sand_color": "default", # classification model: 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
         "pan_off": False, # True to switch pansharpening off for Landsat 7/8/9 imagery
         "s2cloudless_prob": 60, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
-        "max_dist_ref" : 100, # maximum distance from the reference shoreline in meters
+        "max_dist_ref" : 250, # maximum distance from the reference shoreline in meters
     }
 
     #####################
@@ -173,7 +174,13 @@ class Parameters:
     # Intended for putting outputs of many sites in one place, for easier webmap creation
     alternate_trend_plot_dir = None
 
-    # print all variables in class
+    # minimum number of points in time series to create plots and calculate trends
+    # trend set to nan if insufficient points
+    # should be >= 1
+    min_chainage_size = 10
+
+
+    # print all variables in class in alphabetical order
     # written so that it doesn't need updating every time parameters is tweaked
     def print_params(self):
         atts = [attr for attr in dir(self) if not callable(getattr(self, attr)) and not attr.startswith("__")]
@@ -181,7 +188,6 @@ class Parameters:
         for att in atts:
             val = getattr(self, att)
 
-            # print(type(val), type(val) == Dict)
             if type(val) == dict:
                 print(f"{att}: ", end="")
                 print(json.dumps(val, indent=4))
