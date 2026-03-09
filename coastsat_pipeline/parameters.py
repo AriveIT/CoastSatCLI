@@ -13,7 +13,7 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = True # plots all extracted shorelines in different colours
-    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
     skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
@@ -22,7 +22,7 @@ class ImageryOptions:
 @dataclass
 class AnalysisOptions:
     plot_transects: bool = True # plots all extracted shorelines and all transects
-    plot_time_series: bool = True # saves time series of each transect (currently illegible for any reasonable number of transects)
+    plot_time_series: bool = False # saves time series of each transect (currently illegible for any reasonable number of transects)
     write_csv: bool = True # saves time series data to csv file (after outlier rejection)
 
 @dataclass
@@ -85,7 +85,7 @@ class Parameters:
     }
 
     analysis_settings = {
-        "cloud_thresh": 0.5, # percentage of image that can be covered by cloud
+        "cloud_thresh": 0.1, # percentage of image that can be covered by cloud
         "dist_clouds": 300, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
         "check_detection": False, # if True, lets user manually accept/reject the mapped shorelines
         "adjust_detection": False, # lets user adjust the detected shorelines with a slide bar.
@@ -125,7 +125,7 @@ class Parameters:
 
         "cluster_intersection_selection": True, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": ["transect_047"], # plot all intersections for transects with these keys
+        "transects_to_plot": [] #["transect_047"], # plot all intersections for transects with these keys
     }
 
     outlier_settings = {
@@ -173,7 +173,12 @@ class Parameters:
     # if None, then puts everything in output folder
     # Intended for putting outputs of many sites in one place, for easier webmap creation
     alternate_trend_plot_dir = None
-
+    
+    # minimum number of points in time series to create plots and calculate trends
+    # trend set to nan if insufficient points
+    # should be >= 1
+    min_chainage_size = 10
+    
     # print all variables in class in alphabetical order
     # written so that it doesn't need updating every time parameters is tweaked
     def print_params(self):

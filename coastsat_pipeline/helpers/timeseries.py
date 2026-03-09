@@ -28,6 +28,7 @@ def run_time_series_post_processing(
     settings: Dict[str, Any],
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],
+    min_chainage_size: int,
     trend_plot_dir: str | None, # alternate trend plot path
     options: TimeSeriesOptions | None = None,
 ) -> TimeSeriesResult:
@@ -50,7 +51,7 @@ def run_time_series_post_processing(
         valid_dates = np.array(dates)[idx_valid]
         valid_chainage = series[idx_valid]
 
-        if valid_chainage.size > 1:
+        if valid_chainage.size > min_chainage_size:
             trend, fitted = SDS_transects.calculate_trend(valid_dates, valid_chainage)
             processed += 1
 
