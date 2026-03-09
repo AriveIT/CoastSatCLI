@@ -295,14 +295,14 @@ def compute_intersection_QC(output, transects, settings):
         print(f'\rProcessing {key} out of {str(n)}...', end='')
         
         # initialise variables
-        std_intersect = np.zeros(len(shorelines))
-        med_intersect = np.zeros(len(shorelines))
-        max_intersect = np.zeros(len(shorelines))
-        min_intersect = np.zeros(len(shorelines))
-        prc_intersect = np.zeros(len(shorelines))
-        n_intersect = np.zeros(len(shorelines))
+        std_intersect = np.full(len(shorelines), np.nan)
+        med_intersect = np.full(len(shorelines), np.nan)
+        max_intersect = np.full(len(shorelines), np.nan)
+        min_intersect = np.full(len(shorelines), np.nan)
+        prc_intersect = np.full(len(shorelines), np.nan)
+        n_intersect = np.full(len(shorelines), np.nan)
 
-        # n_cluster = np.zeros(len(shorelines))
+        n_cluster = np.full(len(shorelines), np.nan)
 
         ema = np.nan # exponential moving average
         alpha = 0.1 # how much to weight most recent centroid
@@ -334,14 +334,7 @@ def compute_intersection_QC(output, transects, settings):
             
             # in case there are no shoreline points close to the transect 
             if len(idx_close) == 0:
-                std_intersect[i] = np.nan
-                med_intersect[i] = np.nan
-                max_intersect[i] = np.nan
-                min_intersect[i] = np.nan
-                prc_intersect[i] = np.nan
-                n_intersect[i] = np.nan
-
-                # n_cluster[i] = np.nan
+                continue
             else:
                 # change of base to shore-normal coordinate system
                 xy_close = np.array([sl[idx_close,0],sl[idx_close,1]]) - np.tile(np.array([[X0],
@@ -358,16 +351,8 @@ def compute_intersection_QC(output, transects, settings):
                         transect_class = transect_class
                     )
                     
-                    # if no clusters found (or bad case)
+                    # if no clusters found (or bad case eg too many clusters)
                     if clusters[c_idx].size == 0:
-                        std_intersect[i] = np.nan
-                        med_intersect[i] = np.nan
-                        max_intersect[i] = np.nan
-                        min_intersect[i] = np.nan
-                        prc_intersect[i] = np.nan
-                        n_intersect[i] = np.nan
-
-                        # n_cluster[i] = np.nan
                         bad_intersection_count += 1
                         continue
                     
@@ -403,8 +388,7 @@ def compute_intersection_QC(output, transects, settings):
                 min_intersect[i] = np.nanmin(intersections)
                 prc_intersect[i] = np.nanpercentile(intersections, settings['min_prc'])
                 n_intersect[i] = np.sum(~np.isnan(intersections))  # count only non-nan values
-
-                # n_cluster[i] = len(clusters)
+                n_cluster[i] = len(clusters)
 
                 
         # quality control the intersections using dispersion metrics (std and range)
@@ -426,23 +410,27 @@ def compute_intersection_QC(output, transects, settings):
             if prc_over > settings['auto_prc']:
                 med_intersect[~idx_good] = max_intersect[~idx_good]
                 med_intersect[~condition3] = np.nan
+                n_cluster[~idx_good] = np.nan
             # otherwise put a nan
             else:
                 med_intersect[~idx_good] = np.nan
+                n_cluster[~idx_good] = np.nan
                 
         elif settings['multiple_inter'] == 'max':
             med_intersect[~idx_good] = max_intersect[~idx_good]
             med_intersect[~condition3] = np.nan
+            n_cluster[~idx_good] = np.nan
             prc_over = 0
             
         elif settings['multiple_inter'] == 'nan':
             med_intersect[~idx_good] = np.nan
-            # n_cluster[~idx_good] = np.nan
+            n_cluster[~idx_good] = np.nan
             prc_over = 0
 
         elif settings['multiple_inter'] == 'min':
             med_intersect[~idx_good] = prc_intersect[~idx_good]
             med_intersect[~condition3] = np.nan
+            n_cluster[~idx_good] = np.nan
             prc_over = 0
 
         
@@ -453,7 +441,7 @@ def compute_intersection_QC(output, transects, settings):
 
         # store in dict
         cross_dist[key] = med_intersect
-        # plot_n_clusters(cross_dist[key], output['dates'], n_cluster, key, settings['transect_plot_dir'])
+        plot_n_clusters(cross_dist[key], output['dates'], n_cluster, key, settings['transect_plot_dir'])
 
         # plot for troubleshooting
         # if settings['plot_fig']:
