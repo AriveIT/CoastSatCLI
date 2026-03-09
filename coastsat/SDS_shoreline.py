@@ -184,6 +184,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             # determine if transect origins are on land or water
             if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
+            # plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
             on_water = get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
             output_timestamp.append(metadata[satname]['dates'][i])
@@ -223,6 +224,23 @@ def extract_shorelines(metadata, settings, print_errors=False):
         pickle.dump(output, f)
 
     return output
+
+def plot_mndwi_hist(im_mndwi, threshold, date, settings):
+    # prepare plot
+    fig, ax = plt.subplots(figsize=(12, 8), tight_layout=True)
+    ax.set_title(f"MNDWI threshold = {threshold:.3f}", fontsize=14)
+    ax.set_xlabel("MNDWI")
+    ax.set_ylabel("Count")
+
+    # plot things
+    ax.hist(im_mndwi.reshape(-1), bins=np.linspace(-1.2, 1.2, 49))
+    ax.axvline(threshold, color='k', ls="--")
+
+    # save plot
+    output_path = os.path.join(settings["inputs"]["filepath"], "MNDWI_hist")
+    os.makedirs(output_path, exist_ok=True)
+    fig.savefig(os.path.join(output_path, f"MNDWI_{date}.jpg"), dpi=300)
+    plt.close(fig)
 
 def plot_cloud_cover_hist(cloud_covers, settings):
     
@@ -1098,7 +1116,7 @@ def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, co
     ax2.set_title(date, fontweight='bold', fontsize=12)
 
     # create image 3 (MNDWI)
-    ax3.imshow(im_mwi, cmap='bwr')
+    mwi_plot = ax3.imshow(im_mwi, cmap='bwr')
     ax3.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
     ax3.axis('off')
     ax3.set_title(satname, fontweight='bold', fontsize=12)
@@ -1110,9 +1128,9 @@ def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, co
     ax3.set_anchor('E')
     
     # add colorbar for MNDWI
-    # cb = plt.colorbar(mwi_plot)
-    # cb.ax.tick_params(labelsize=10)
-    # cb.set_label('MNDWI values')
+    cb = plt.colorbar(mwi_plot)
+    cb.ax.tick_params(labelsize=10)
+    cb.set_label('MNDWI values')
 
     if plot_extra:
         ax5.imshow(im_RGB)
