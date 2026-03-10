@@ -438,10 +438,11 @@ def compute_intersection_QC(output, transects, settings):
             raise Exception('the multiple_inter parameter can only be: nan, max or auto')
 
         
-
         # store in dict
         cross_dist[key] = med_intersect
-        plot_n_clusters(cross_dist[key], output['dates'], n_cluster, key, settings['transect_plot_dir'])
+
+        # transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
+        # plot_n_clusters(cross_dist[key], output['dates'], n_cluster, transect_classes, key, settings['transect_plot_dir'])
 
         # plot for troubleshooting
         # if settings['plot_fig']:
@@ -602,26 +603,43 @@ def get_plot_range(p0, p1, buffer_ratio=1.5):
 
     return x_lim, y_lim
 
-def plot_n_clusters(chainage, dates, n_clusters, transect_key, dir):
+
+def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key, dir):
+    # note: invalid classes with 2 clusters are thrown out - therefore not plotted
 
     # preprocessing
     idx_not_nan = np.where(~np.isnan(n_clusters))[0]
     idx1 = np.where(n_clusters == 1)[0]
     idx2 = np.where(n_clusters == 2)[0]
+    idx_land = np.where(transect_classes == 0)[0]
+    idx_water = np.where(transect_classes == 1)[0]
+    idx_invalid = np.where(transect_classes == -1)[0]
+    
+    idx_1_land = np.intersect1d(idx1, idx_land)
+    idx_1_water = np.intersect1d(idx1, idx_water)
+    idx_1_invalid = np.intersect1d(idx1, idx_invalid)
+    idx_2_land = np.intersect1d(idx2, idx_land)
+    idx_2_water = np.intersect1d(idx2, idx_water)
+
     pct_2_cluster = (len(idx2) / len(idx_not_nan)) * 100
 
     # prep fig
     fig,ax=plt.subplots(1,1,figsize=[12,6], sharex=True)
     fig.set_tight_layout(True)
+    fig.suptitle(f'{transect_key} time-series: {pct_2_cluster:.3f}% 2 cluster')
     ax.grid(linestyle=':', color='0.5')
-    ax.set(ylabel='distance [m]',
-                title= f'{transect_key} time-series: {pct_2_cluster:.3f}% 2 cluster')
+    ax.set_ylabel('distance [m]')
     
     # plot the data points
-    ax.plot([dates[i] for i in idx_not_nan], chainage[idx_not_nan], 'C0-')
-    ax.plot([dates[i] for i in idx1], chainage[idx1], 'C2o', ms=4, mec='k', mew=0.7,label='1 cluster')
-    ax.plot([dates[i] for i in idx2], chainage[idx2], 'C3o', ms=4, mec='k', mew=0.7,label='2 cluster')
-    ax.legend(ncol=2,loc='upper right')
+    ax.plot([dates[i] for i in idx_not_nan], chainage[idx_not_nan], c=str(0.8), linestyle='-') # line
+    ax.plot([dates[i] for i in idx_1_land], chainage[idx_1_land], 'C2o', ms=4, mfc='w', mec='C2', label="1 cluster + land")
+    ax.plot([dates[i] for i in idx_1_water], chainage[idx_1_water], 'C0o', ms=4, mfc='w', mec='C0', label="1 cluster + water")
+    ax.plot([dates[i] for i in idx_1_invalid], chainage[idx_1_invalid], 'C3o', ms=4, mfc='w', mec='C3', label="1 cluster + invalid")
+    ax.plot([dates[i] for i in idx_2_land], chainage[idx_2_land], 'C2o', ms=4, mec='C2', label="2 cluster + land")
+    ax.plot([dates[i] for i in idx_2_water], chainage[idx_2_water], 'C0o', ms=4, mec='C0', label="2 cluster + water")
+
+    fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=2)
+    fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
     
     # save
     os.makedirs(f"{dir}\\n_clusters", exist_ok=True)
