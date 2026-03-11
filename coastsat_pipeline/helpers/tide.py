@@ -70,11 +70,13 @@ def _apply_csv_tide_correction(
         raise ValueError("Tide CSV must contain 'dates' and 'tide' columns")
     
     print(f"Converting {len(tide_data['dates'])} dates...")
-    # dates_ts = [pd.to_datetime(d).to_pydatetime() for d in tide_data["dates"]] # this takes a while
     dates_ts = [_ensure_aware(pd.to_datetime(d)) for d in tide_data["dates"]] # this takes a while
     tides_ts = np.asarray(tide_data["tide"], dtype=float)
+    mean_tide_height = np.nanmean(tides_ts)
+
     dates_sat = output["dates"]
     tides_sat = np.asarray(SDS_tools.get_closest_datapoint(dates_sat, dates_ts, tides_ts), dtype=float) # note: no interpolation
+    tides_sat -= mean_tide_height # we want to tidally correct to average tide elevation
 
     tide_filter_cfg = settings.get("tide_filter")
     tide_filter_mask = np.ones_like(tides_sat, dtype=bool)

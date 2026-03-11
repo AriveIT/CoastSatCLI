@@ -670,6 +670,7 @@ def get_closest_datapoint(dates, dates_ts, values_ts):
     for i,date in enumerate(dates):
         print('\rExtracting closest points: %d%%' % int((i+1)*100/len(dates)), end='')
         temp.append(values_ts[find(min(item for item in dates_ts if item > date), dates_ts)])
+    print()
     values = np.array(temp)
     
     return values
