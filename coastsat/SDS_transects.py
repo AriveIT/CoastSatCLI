@@ -378,6 +378,7 @@ def compute_intersection_QC(output, transects, settings):
                             settings['transect_plot_dir'])
 
                     intersections = clusters[c_idx]
+                    n_cluster[i] = len(clusters)
                 else:
                     intersections = xy_rot[0,:]
 
@@ -388,7 +389,6 @@ def compute_intersection_QC(output, transects, settings):
                 min_intersect[i] = np.nanmin(intersections)
                 prc_intersect[i] = np.nanpercentile(intersections, settings['min_prc'])
                 n_intersect[i] = np.sum(~np.isnan(intersections))  # count only non-nan values
-                n_cluster[i] = len(clusters)
 
                 
         # quality control the intersections using dispersion metrics (std and range)
@@ -441,8 +441,9 @@ def compute_intersection_QC(output, transects, settings):
         # store in dict
         cross_dist[key] = med_intersect
 
-        # transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
-        # plot_n_clusters(cross_dist[key], output['dates'], n_cluster, transect_classes, key, settings['transect_plot_dir'])
+        if settings.get("plot_n_clusters", False) and settings.get('cluster_intersection_selection', False):
+            transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
+            plot_n_clusters(cross_dist[key], output['dates'], n_cluster, transect_classes, key, settings['transect_plot_dir'])
 
         # plot for troubleshooting
         # if settings['plot_fig']:

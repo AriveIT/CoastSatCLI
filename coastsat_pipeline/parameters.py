@@ -13,10 +13,10 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = True # plots all extracted shorelines in different colours
-    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
-    skip_jpg: bool = False # skip saving jpg altogether (saving jpg is not necessary for analysis)
+    skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
     prompt_for_ideal_selection: bool = False
 
 @dataclass
@@ -97,6 +97,7 @@ class Parameters:
         "pan_off": False, # True to switch pansharpening off for Landsat 7/8/9 imagery
         "s2cloudless_prob": 60, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
         "max_dist_ref" : 250, # maximum distance from the reference shoreline in meters
+        "plot_mndwi": False, # plot histograms of MNDWI values for each image
     }
 
     #####################
@@ -125,7 +126,8 @@ class Parameters:
 
         "cluster_intersection_selection": True, # use clustering intersection algorithm
         "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": ["transect_025", "transect_050", "transect_076"], # plot all intersections for transects with these keys
+        "transects_to_plot": ["transect_184", "transect_193"], # ["transect_025", "transect_050", "transect_076"], # plot all intersections for transects with these keys
+        "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
     }
 
     outlier_settings = {

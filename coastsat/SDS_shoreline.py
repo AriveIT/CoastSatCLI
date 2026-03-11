@@ -184,7 +184,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             # determine if transect origins are on land or water
             if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
-            # plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
+            if settings.get("plot_mndwi", False): plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
             on_water = get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
             output_timestamp.append(metadata[satname]['dates'][i])
