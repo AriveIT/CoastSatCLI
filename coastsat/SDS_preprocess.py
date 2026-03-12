@@ -197,9 +197,11 @@ def preprocess_single(fn, satname, cloud_mask_issue, pan_off, s2cloudless_prob=4
                     im_ms_ps = im_ms[:,:,[0,1,2]]
                 # add downsampled NIR and SWIR1 bands
                 im_ms_ps = np.append(im_ms_ps, im_ms[:,:,[3,4]], axis=2)
+                # plot_pansharpening(im_ms[:,:,[0,1,2]], im_ms_ps[:,:,[0,1,2]], fn[0].split("\\")[-1][:19], cloud_mask)
                 im_ms = im_ms_ps.copy()
                 # the extra image is the 15m panchromatic band
                 im_extra = im_pan
+                
                 
     #=============================================================================================#
     # S2 images
@@ -513,6 +515,26 @@ def pansharpen(im_ms, im_pan, cloud_mask):
     im_ms_ps = vec_ms_ps_full.reshape(im_ms.shape[0], im_ms.shape[1], im_ms.shape[2])
 
     return im_ms_ps
+
+def plot_pansharpening(im, im_ps, date, cloud_mask):
+    fig, ax = plt.subplots(1, 2, figsize=(12, 8), tight_layout=True)
+    fig.suptitle(f"Pansharpening: {im.shape = }, {im_ps.shape = }", fontsize=14)
+    ax[0].axis("off")
+    ax[1].axis("off")
+    ax[0].set_title("Original")
+    ax[1].set_title("Pansharpened")
+
+    # plot things
+    ax[0].imshow(rescale_image_intensity(im[:,:,[2,1,0]], cloud_mask, 99.9))
+    ax[1].imshow(rescale_image_intensity(im_ps[:,:,[2,1,0]], cloud_mask, 99.9))
+
+    # save plot
+    output_path = "C:\\Users\\avanever\\Documents\\CoastSatProject\Sites\\rose-spit\\outputs\\pansharpening"
+    fn = f"pansharpening_{date}.jpg"
+    os.makedirs(output_path, exist_ok=True)
+
+    fig.savefig(os.path.join(output_path, fn), dpi=300)
+    plt.close(fig)
 
 def rescale_image_intensity(im, cloud_mask, prob_high):
     """

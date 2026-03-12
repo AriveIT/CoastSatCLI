@@ -121,6 +121,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 error_skipped += 1
                 continue
 
+            # plot_cloud_masks(im_ms, cloud_mask, settings, filenames[i][:19])
+
             image_epsg = metadata[satname]['epsg'][i]
 
             cloud_cover_combined = np.divide(sum(sum(cloud_mask.astype(int))),
@@ -224,6 +226,21 @@ def extract_shorelines(metadata, settings, print_errors=False):
         pickle.dump(output, f)
 
     return output
+
+def plot_cloud_masks(im_ms, cloud_mask, settings, date):
+    fig, ax = plt.subplots(figsize=(12, 8), tight_layout=True)
+    ax.set_title(f"Cloud Mask Shape: {cloud_mask.shape}, im_ms shape: {im_ms.shape}", fontsize=14)
+    ax.axis("off")
+
+    # plot things
+    ax.imshow(cloud_mask)
+
+    # save plot
+    output_path = os.path.join(settings["inputs"]["filepath"], "Cloud Masks")
+    os.makedirs(output_path, exist_ok=True)
+    fig.savefig(os.path.join(output_path, f"Cloud_Mask_{date}.jpg"), dpi=300)
+    plt.close(fig)
+
 
 def plot_mndwi_hist(im_mndwi, threshold, date, settings):
     # prepare plot
