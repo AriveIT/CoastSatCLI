@@ -18,6 +18,7 @@ import pdb
 import skimage.transform as transform
 from pylab import ginput
 from scipy import stats
+from scipy.spatial import cKDTree
 
 # CoastSat modules
 from coastsat import SDS_tools
@@ -288,6 +289,12 @@ def compute_intersection_QC(output, transects, settings):
     
     shorelines = output['shorelines']
 
+    # pre-calculate values for cloud intersections
+    t = next(iter(transects.values())) # grab some transect
+    t_length = np.linalg.norm(t[-1,:] - t[0,:])
+    half_collider_length = (t_length + settings["past_dist"] - settings["min_chainage"]) / 2
+    query_radius = np.sqrt(half_collider_length ** 2 + settings["along_dist"] ** 2) # distance from collider center to collider corner
+
     # loop through each transect
     n = len(transects.keys())
     for transect_idx, key in enumerate(transects.keys()):
@@ -312,31 +319,36 @@ def compute_intersection_QC(output, transects, settings):
             
             sl = shorelines[i]
             intersections = get_intersections(transects[key], sl, settings)
+
             if intersections is None:
                 continue
 
             if settings.get('cluster_intersection_selection', False):
+                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], output["cloud_kdtrees"][i], query_radius, half_collider_length, settings)
                 transect_class = output['transect_origin_classes'][i][transect_idx]
-                clusters, centroids, c_idx = cluster_intersection_selection(
+                clusters, centroids, c_idx, c_info = cluster_intersection_selection(
                     intersections = intersections[~np.isnan(intersections)],
                     clustering_threshold = settings['clustering_threshold'],
-                    transect_class = transect_class
+                    transect_class = transect_class,
+                    cloud_min_max = cloud_min_max
                 )
                 
+                # plot intersections and other clustering alg related info
+                if key in settings.get('transects_to_plot', []):
+                    plot_clustering_intersections(intersections, key, sl, transects[key], transect_class,
+                            centroids, c_idx, c_info, cloud_min_max, cloud_points, str(output['dates'][i])[:10], settings)
+
                 # if no clusters found (or bad case eg too many clusters)
-                if clusters[c_idx].size == 0:
+                if c_info < 0:
                     bad_intersection_count += 1
                     continue
                 
                 # not sure if ema is useful yet, probably better to leave outlier rejection for when can view entire time series
-                # ema = update_ema(ema, alpha, centroids[c_idx]) 
-                intersections = clusters[c_idx]
+                # ema = update_ema(ema, alpha, centroids[c_idx])
+                intersections = clusters[c_idx] # update intersections to just selected cluster
                 n_cluster[i] = len(clusters)
 
-                # plot intersections and other clustering alg related info
-                if key in settings.get('transects_to_plot', []):
-                    plot_clustering_intersections(intersections, key, sl, transects[key], transect_class,
-                            centroids, c_idx, str(output['dates'][i])[:10], settings)
+                
 
             # compute std, median, max, min of the intersections (for current transect-shoreline pair)
             std_intersect[i] = np.nanstd(intersections)
@@ -452,7 +464,12 @@ def get_intersections(transect, sl, settings):
     # remove points that are too far landwards relative to the transect origin (i.e., negative chainage)
     xy_rot[0, xy_rot[0,:] < settings['min_chainage']] = np.nan
 
+    # if all intersections are too far landwards
+    if np.all(np.isnan(xy_rot[0,:])):
+        return None
+
     return xy_rot[0,:]
+
 
 def update_ema(ema, alpha, new_value):
     if np.isnan(new_value): return ema
@@ -464,21 +481,71 @@ def update_ema(ema, alpha, new_value):
 # Cluster Intersection Selection Algorithm
 ###################################################################################################
 
-def cluster_intersection_selection(intersections, clustering_threshold, transect_class):
+# given a set of intersections, apply 1d clustering, and select the cluster that corresponds to the correct
+# shoreline given the sign (+/-) of the clusters and the class of the transect (if origin is on land/water)
+# factors in if clouds could be covering the correct shoreline
+# assumes intersections is not empty
+
+# returns clusters, centroids, index of selected centroid, info
+# info:
+# 1: returned correct centroid
+# -1: unclassified transect
+# -2: centroid in cloud
+# -3: cloud preferred over shoreline
+# -4: 2 clusters + cloud
+# -5: >2 clusters
+def cluster_intersection_selection(intersections, clustering_threshold, transect_class, cloud_min_max):
+
+    # if transect is unclassified, then something is covering it
+    if transect_class == -1:
+        return None, None, -1, -1
+
+    # get clusters
     clusters = cluster1d(intersections, threshold=clustering_threshold)
     centroids = np.array([np.mean(c) for c in clusters])
+
+    if cloud_min_max:
+        
+        # check if any centroids are inside cloud
+        centroids_in_cloud = np.any(np.logical_and(centroids > cloud_min_max[0], centroids < cloud_min_max[1]))
+        if centroids_in_cloud:
+            return clusters, centroids, -1, -2     
+
+        if len(clusters) == 1:
+
+            # see if imaginary cloud covered shoreline would be preferred
+            cloud_centroid = (cloud_min_max[0] + cloud_min_max[1]) / 2
+
+            # centroids have to be in increasing order
+            if cloud_centroid < centroids[0]:
+                temp_centroids = np.array([cloud_centroid, centroids[0]])
+                cloud_idx = 0
+            else:
+                temp_centroids = np.array([centroids[0], cloud_centroid]) 
+                cloud_idx = 1
+            
+            centroid_idx = select_centroid(temp_centroids, transect_class)
+            
+            if centroid_idx == cloud_idx: return None, None, -1, -3 # skip intersection if cloud preferred 
+            else: return clusters, centroids, 0, 1 # if shoreline is preferred, we're good to go
+        
+        # 2 clusters + cloud = potentially 3 shorelines --> ambiguous case
+        # here for clarity and more detailed info
+        if len(clusters) == 2:
+            return clusters, centroids, -1, -4
+
+    else:
+
+        if len(clusters) == 1:
+            return clusters, centroids, 0, 1
+        
+        if len(clusters) == 2:
+            centroid_idx = select_centroid(centroids, transect_class)
+            return clusters, centroids, centroid_idx, 1
     
-    if len(clusters) == 2 and transect_class != -1:
-        centroid_idx = select_centroid(centroids, transect_class)
-        return clusters, centroids, centroid_idx
-    elif len(centroids) == 1:
-        centroid_idx = 0
-        return clusters, centroids, centroid_idx
-    
-    # if more than 2 or 0 clusters, or 2 clusters and transect_class is invalid
-    # then this alg doesn't work so we return nothing
+    # if more >2  clusters, picking shoreline becomes slightly ambiguous in some cases
     # if 3 clusters is a common case (and consistently not noise), should consider adding handling
-    return np.array([[]]), np.nan, -1 # make np array have same shape just in case
+    return clusters, centroids, -1, -5
     
 
 # simple gap based 1d clustering based on given threshold
@@ -493,8 +560,39 @@ def cluster1d(intersections, threshold):
 # transect_class = 1 --> transect origin is on water
 # assumes exactly 2 centroids, and transect classes are valid (0 or 1)
 # determines which shoreline to pick (first or second centroid)
+# assumes centroids are in increasing order
 def select_centroid(centroids, transect_class):
     return int(np.logical_xor(transect_class, np.logical_xor(centroids[0] > 0, centroids[1] > 0)))
+
+# could move no label transect check before cloud intersection calculation (nice to have plots tho)
+
+# returns the minimum and maximum intersections of given cloud and transect
+def get_cloud_min_max(transect, cloud_tree, query_radius, half_collider_length, settings):
+
+    collider_center = get_collider_center(transect, settings["min_chainage"], half_collider_length)
+    cloud_indices = cloud_tree.query_ball_point(collider_center, query_radius)
+    if cloud_indices == []:
+        return None, None
+
+    cloud_coords = cloud_tree.data[cloud_indices]
+    intersections = get_intersections(transect, cloud_coords, settings)
+    if intersections is None:
+        return None, None
+
+    # probably a clumsy way of getting resolution, but doesn't need to know satellite
+    resolution = 30 # resolution in worst case (L5)
+    buffer = resolution * 0.707 # ~root(2) / 2 --> distance from pixel center to corner
+
+    return (np.min(intersections) - buffer, np.max(intersections) + buffer), cloud_coords
+
+def get_collider_center(transect, min_chainage, half_collider_length):
+    dir = normalize(transect[-1,:] - transect[0,:])
+    center = transect[0,:] + (min_chainage + half_collider_length) * dir
+    return center
+
+def normalize(vector):
+    magnitude = np.linalg.norm(vector)
+    return vector / magnitude
 
 
 ###################################################################################################
@@ -507,41 +605,68 @@ Plots:
     - Intersections, centroids, with selected centroid marked
     - Shoreline points
     - Transect origin, coloured based on class
-    - Plots 2D version, and also projected onto transect
+    - Nearby cloud points and min/max cloud intersections
+    - Plots 2D version (zoomed in and zoomed out), and also projected onto transect
 """
-def plot_clustering_intersections(intersections, key, sl, transect, transect_class, centroids, centroid_idx, date, settings):
+def plot_clustering_intersections(intersections, key, sl, transect, transect_class, centroids, centroid_idx, cluster_info, cloud_min_max, cloud_points, date, settings):
     origin_colormap = {
         -1 : 'gray',
         0 : 'green',
         1 : 'blue'
     }
+
+    # if rejected, get reason
+    reason = ""
+    if cluster_info < 0:
+        reason += "rejected: "
+        if cluster_info == -1: reason += "unclassified transect"
+        elif cluster_info == -2: reason += "centroid in cloud"
+        elif cluster_info == -3: reason += "cloud preferred over shoreline"
+        elif cluster_info == -4: reason += "2 clusters + cloud"
+        elif cluster_info == -5: reason += ">2 clusters"
+    else:
+        reason += "passed"
+
     transect_p0 = transect[0,:]
     transect_p1 = transect[-1,:]
 
-    fig, axs = plt.subplots(1, 2)
-    fig.suptitle(f'{key} on {date}')
+    fig, axs = plt.subplots(1, 3, figsize=(12, 8)) # 0: 1d, 1: 2d
+    fig.suptitle(f'{key} on {date}: {reason}')
 
-    # plot intersections and centroids in 1d scatterplot
+    # plot intersections in 1d scatterplot
     axs[0].plot(intersections, np.zeros_like(intersections), 'o', alpha=0.5, label="shoreline")
-    axs[0].plot(centroids, np.zeros_like(centroids), 'o', c='black', label="centroids")
 
     # plot shoreline and transect
     axs[1].plot(sl[:, 0], sl[:, 1], ".", markersize=2)
     axs[1].plot([transect_p0[0], transect_p1[0]], [transect_p0[1], transect_p1[1]], alpha=0.5, label="transect")
     axs[1].plot([transect_p0[0]], [transect_p0[1]], 'o', c=origin_colormap[transect_class], markersize=5) # transect origin
 
+    axs[2].plot(sl[:, 0], sl[:, 1], ".", markersize=2)
+    axs[2].plot([transect_p0[0], transect_p1[0]], [transect_p0[1], transect_p1[1]], alpha=0.5)
+    axs[2].plot([transect_p0[0]], [transect_p0[1]], 'o', c=origin_colormap[transect_class], markersize=5) # transect origin
+
+    # plot centroids
+    if centroids is not None:
+        axs[0].plot(centroids, np.zeros_like(centroids), 'o', c='black', label="centroids")
+        centroid_trans = get_points_along_transect(transect_p0, transect_p1, centroids)
+        axs[1].plot(centroid_trans[:, 0], centroid_trans[:, 1], ".", c='black', markersize=6)
+
+    # mark selected centroid
+    if cluster_info == 1:
+        axs[0].scatter(centroids[centroid_idx], np.zeros_like(centroids[centroid_idx]), facecolors='none', edgecolors='black', s=200, label="selected")
+        axs[1].scatter(centroid_trans[centroid_idx, 0], centroid_trans[centroid_idx, 1], facecolors='none', edgecolors='black', s=200)
+
+    # plot clouds
+    if cloud_min_max is not None:
+        axs[0].plot(cloud_min_max, np.zeros_like(cloud_min_max), 'o', c='cyan', alpha=0.5, label="clouds")
+    if cloud_points is not None:    
+        axs[1].plot(cloud_points[:, 0], cloud_points[:, 1], ".", c='cyan', markersize=2)
+        axs[2].plot(cloud_points[:, 0], cloud_points[:, 1], ".", c='cyan', markersize=2)
+
     # plot collider
     collider = get_transect_collider(transect_p0, transect_p1, settings["min_chainage"], settings["past_dist"], settings["along_dist"])
     axs[1].plot(*collider, c='red', label="collider")
-
-    # plot centroids on transect
-    centroid_trans = get_points_along_transect(transect_p0, transect_p1, centroids)
-    axs[1].plot(centroid_trans[:, 0], centroid_trans[:, 1], ".", c='black', markersize=6)
-
-    # mark selected centroid
-    if centroid_idx != -1:
-        axs[0].scatter(centroids[centroid_idx], np.zeros_like(centroids[centroid_idx]), facecolors='none', edgecolors='black', s=200, label="selected")
-        axs[1].scatter(centroid_trans[centroid_idx, 0], centroid_trans[centroid_idx, 1], facecolors='none', edgecolors='black', s=200)
+    axs[2].plot(*collider, c='red')
 
     # plot ema
     # axs[0].scatter(ema, np.zeros_like(ema), facecolors='none', edgecolors='purple', s=200, label="ema")
@@ -549,15 +674,22 @@ def plot_clustering_intersections(intersections, key, sl, transect, transect_cla
     # axs[1].scatter(ema_trans[:, 0], ema_trans[:, 1], facecolors='none', edgecolors='purple', s=200)
 
     # for better visibility
-    # axs[1].axis('equal') # note: some centroids look off because of skew, but uncommenting this zooms out a lot (kinda ignores lims)
-    x_lim, y_lim = get_plot_range(transect_p0, transect_p1)
+    x_lim, y_lim = get_plot_range(collider)
+
+    axs[0].get_yaxis().set_visible(False)
     axs[1].set_xlim(x_lim[0], x_lim[1])
     axs[1].set_ylim(y_lim[0], y_lim[1])
-    axs[0].get_yaxis().set_visible(False)
+    axs[1].set_aspect('equal', adjustable='box')
+    axs[1].get_xaxis().set_visible(False)
+    axs[1].get_yaxis().set_visible(False)
+    axs[2].get_xaxis().set_visible(False)
+    axs[2].get_yaxis().set_visible(False)
+    axs[2].axis('equal')
 
     fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=3)
     fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
     
+    # save plot
     filepath = f"{settings['transect_plot_dir']}\\{key}_intersection_plots"
     if not os.path.exists(filepath):
                 os.mkdir(filepath)
@@ -578,22 +710,26 @@ def get_transect_collider(p0, p1, min_chainage, past_dist, along_dist):
 
     v1 = p1 + past_dist * norm - along_dist * orth
     v2 = p1 + past_dist * norm + along_dist * orth
-    v3 = p0 + min_chainage * norm + along_dist * orth # min_chainage is already relative to origin (don't need to subtract)
+    v3 = p0 + min_chainage * norm + along_dist * orth # min_chainage is relative to origin (don't need to subtract)
     v4 = p0 + min_chainage * norm - along_dist * orth
 
     return ([v1[0], v2[0], v3[0], v4[0], v1[0]], [v1[1], v2[1], v3[1], v4[1], v1[1]])
 
-def get_plot_range(p0, p1, buffer_ratio=1.5):
-    x_max = max(p0[0], p1[0])
-    x_min = min(p0[0], p1[0])
-    x_range = x_max - x_min
-    y_max = max(p0[1], p1[1])
-    y_min = min(p0[1], p1[1])
-    y_range = y_max - y_min
-
-    # add buffer to bounding box proportional to x and y ranges
-    x_lim = (x_min - buffer_ratio * x_range, x_max + buffer_ratio * x_range)
-    y_lim = (y_min - buffer_ratio * y_range, y_max + buffer_ratio * y_range)
+def get_plot_range(collider, buffer=10):
+    x = collider[0][:4] # leave out repeated point
+    y = collider[1][:4]
+    x_max = np.max(x)
+    x_min = np.min(x)
+    y_max = np.max(y)
+    y_min = np.min(y)
+    
+    r = max(x_max-x_min, y_max-y_min) / 2
+    x_mean = np.mean(x)
+    y_mean = np.mean(y)
+    
+    r += buffer
+    x_lim = (x_mean - r, x_mean + r)
+    y_lim = (y_mean - r, y_mean + r)
 
     return x_lim, y_lim
 

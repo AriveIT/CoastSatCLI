@@ -78,6 +78,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
         output_idxkeep = []
         output_t_mndwi = []
         output_transect_origin_classes = []
+        output_cloud_kdtrees = []
 
         str_new = ''
         if not sklearn.__version__[:4] == '0.20':
@@ -189,6 +190,12 @@ def extract_shorelines(metadata, settings, print_errors=False):
             if settings.get("plot_mndwi", False): plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
             on_water = get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
+            # build cloud mask kd tree
+            cloud_idx = np.column_stack(np.where(cloud_mask))
+            cloud_coords = SDS_tools.convert_pix2world(cloud_idx, georef)
+            cloud_coords = SDS_tools.convert_epsg(cloud_coords, image_epsg, settings['output_epsg'])
+            cloud_kdtree = cKDTree(cloud_coords)
+
             output_timestamp.append(metadata[satname]['dates'][i])
             output_shoreline.append(shoreline)
             output_filename.append(filenames[i])
@@ -197,6 +204,9 @@ def extract_shorelines(metadata, settings, print_errors=False):
             output_idxkeep.append(i)
             output_t_mndwi.append(t_mndwi)
             output_transect_origin_classes.append(on_water)
+            
+            # for cloud intersections
+            output_cloud_kdtrees.append(cloud_kdtree)
 
         output[satname] = {
             'dates': output_timestamp,
@@ -206,7 +216,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
             'geoaccuracy': output_geoaccuracy,
             'idx': output_idxkeep,
             'MNDWI_threshold': output_t_mndwi,
-            'transect_origin_classes': output_transect_origin_classes
+            'transect_origin_classes': output_transect_origin_classes,
+            'cloud_kdtrees': output_cloud_kdtrees,
         }
 
         print()
@@ -304,16 +315,19 @@ def get_transect_origin_classes(transect_origins, im_mndwi, t_mndwi, cloud_mask,
     on_water = np.full(inside.shape, -1)
     on_water[valid] = (im_mndwi[transect_origins_pxl[valid,1], transect_origins_pxl[valid,0]] < t_mndwi).astype(int)
 
-    # dir = "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\classif_plots\\mndwi"
-    # plot_classified_transect_origins(transect_origins_pxl, on_water, im_mndwi, filename, dir)
+    # plot_classified_transect_origins(transect_origins_pxl, on_water, im_mndwi, filename)
     return on_water
  
 
-def plot_classified_transect_origins(transect_origins_pxl, on_water, im, filename, dir):   
+def plot_classified_transect_origins(transect_origins_pxl, on_water, im, filename): 
+    colors = ["blue" if w==1 else "green" if w==0 else "gray" for w in on_water]
+
     fig, ax = plt.subplots()
     ax.imshow(im)
-    colors = ["blue" if w==1 else "green" if w==0 else "gray" for w in on_water]
+    
     ax.scatter(transect_origins_pxl[:,0], transect_origins_pxl[:,1], c=colors, s=0.1)
+
+    dir = "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots\\classif_plots\\mndwi"
     fig.savefig(f"{dir}\\{filename}_mndwi.png", dpi=400)
     plt.close(fig)
 
