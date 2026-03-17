@@ -493,6 +493,8 @@ def compute_intersection_QC_V2(output, transects, settings):
     n_intersect = init_var()
     n_cluster = init_var()
 
+    rejection_counts = np.zeros((len(transects.keys()), 7)) # 7 possible counts an intersection is rejected
+
     # loop through each shoreline
     n = len(shorelines)
     for sl_idx in range(len(shorelines)):
@@ -505,6 +507,7 @@ def compute_intersection_QC_V2(output, transects, settings):
             intersections = get_intersections(transects[key], sl, settings)
 
             if intersections is None:
+                update_rejection_counts(rejection_counts[transect_idx], 7) # 7 means no intersections
                 continue
 
             if settings.get('cluster_intersection_selection', False):
@@ -524,6 +527,7 @@ def compute_intersection_QC_V2(output, transects, settings):
 
                 # if no cluster selected
                 if c_info < 0:
+                    update_rejection_counts(rejection_counts[transect_idx], abs(c_info))
                     continue
                 
                 intersections = clusters[c_idx] # update intersections to just selected cluster
@@ -537,6 +541,7 @@ def compute_intersection_QC_V2(output, transects, settings):
             n_intersect[sl_idx, transect_idx] = np.sum(~np.isnan(intersections))  # count only non-nan values
            
     # quality control the intersections using dispersion metrics (std and range)
+    n_nan_before = np.sum(np.isnan(med_intersect), axis=0)
     condition1 = std_intersect <= settings['max_std']
     condition2 = (max_intersect - min_intersect) <= settings['max_range']
     condition3 = n_intersect >= settings['min_points']
@@ -544,6 +549,7 @@ def compute_intersection_QC_V2(output, transects, settings):
     
     med_intersect[~idx_good] = np.nan
     n_cluster[~idx_good] = np.nan
+    n_nan_after = np.sum(np.isnan(med_intersect), axis=0)
 
     # save intersections for each transect in dictionary
     cross_dist = {key: med_intersect[:,transect_idx] for transect_idx, key in enumerate(transects.keys())}
@@ -553,6 +559,11 @@ def compute_intersection_QC_V2(output, transects, settings):
         for transect_idx, key in enumerate(transects.keys()):
             transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
             plot_n_clusters(cross_dist[key], output['dates'], n_cluster[:,0], transect_classes, key, settings['output_dir'])
+
+    # plot why intersections were rejected for each transect
+    if settings.get("plot_rejection_counts", False) and settings.get('cluster_intersection_selection', False):
+        rejection_counts[:,5] = n_nan_after - n_nan_before # rejections from dispersion metrics
+        plot_rejection_counts(rejection_counts, len(shorelines), settings['output_dir'])
 
     print()
     return cross_dist
@@ -876,7 +887,7 @@ def get_plot_range(collider, buffer=10):
 
 
 def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key, dir):
-    # note: invalid classes with 2 clusters are thrown out - therefore not plotted
+    # note: invalid classes are thrown out - therefore not plotted
 
     # preprocessing
     idx_not_nan = np.where(~np.isnan(n_clusters))[0]
@@ -884,11 +895,9 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     idx2 = np.where(n_clusters == 2)[0]
     idx_land = np.where(transect_classes == 0)[0]
     idx_water = np.where(transect_classes == 1)[0]
-    idx_invalid = np.where(transect_classes == -1)[0]
     
     idx_1_land = np.intersect1d(idx1, idx_land)
     idx_1_water = np.intersect1d(idx1, idx_water)
-    idx_1_invalid = np.intersect1d(idx1, idx_invalid)
     idx_2_land = np.intersect1d(idx2, idx_land)
     idx_2_water = np.intersect1d(idx2, idx_water)
 
@@ -905,7 +914,6 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     ax.plot([dates[i] for i in idx_not_nan], chainage[idx_not_nan], c=str(0.8), linestyle='-') # line
     ax.plot([dates[i] for i in idx_1_land], chainage[idx_1_land], 'C2o', ms=4, mfc='w', mec='C2', label="1 cluster + land")
     ax.plot([dates[i] for i in idx_1_water], chainage[idx_1_water], 'C0o', ms=4, mfc='w', mec='C0', label="1 cluster + water")
-    ax.plot([dates[i] for i in idx_1_invalid], chainage[idx_1_invalid], 'C3o', ms=4, mfc='w', mec='C3', label="1 cluster + invalid")
     ax.plot([dates[i] for i in idx_2_land], chainage[idx_2_land], 'C2o', ms=4, mec='C2', label="2 cluster + land")
     ax.plot([dates[i] for i in idx_2_water], chainage[idx_2_water], 'C0o', ms=4, mec='C0', label="2 cluster + water")
 
@@ -915,6 +923,48 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     # save
     os.makedirs(f"{dir}\\n_clusters", exist_ok=True)
     fig.savefig(f"{dir}\\n_clusters\\{transect_key}_n_clusters.png")
+
+# 1: unclassified transect
+# 2: centroid in cloud
+# 3: cloud preferred over shoreline
+# 4: 2 clusters + cloud
+# 5: >2 clusters
+# 6: dispersion metrics
+# 7: no intersections
+def update_rejection_counts(rejection_counts, c_info):
+    rejection_counts[c_info - 1] += 1
+
+def plot_rejection_counts(rejection_counts, n_shorelines, dir):
+    reasons = [
+        "unclassified transect",
+        "centroid in cloud",
+        "cloud preferred",
+        "2 clusters + cloud",
+        ">2 clusters",
+        "dispersion metrics",
+        "no intersections",
+    ]
+    n_transects = rejection_counts.shape[0]
+
+    reason_counts = {reason: rejection_counts[:,idx] for reason, idx in zip(reasons, range(len(reasons)))}
+
+    fig, ax = plt.subplots(figsize=(12,8))
+    fig.suptitle("Rejection counts for each transect")
+    ax.set_xlabel("Transect Index")
+    ax.set_ylabel("Counts")
+    bottom = np.zeros(n_transects)
+    x_pos = np.arange(1, n_transects + 1) # generated transect labels start at 1
+    width=1
+
+    for reason, count in reason_counts.items():
+        p = ax.bar(x_pos, height=count, width=width, label=reason, bottom=bottom)
+        bottom += count
+    
+    ax.axhline(n_shorelines, linestyle="--", color="k", label="total # shorelines")
+    fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=2)
+    fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
+
+    fig.savefig(f"{dir}\\rejection_counts.png")
 
 ###################################################################################################
 # DESPIKING/OUTLIER REMOVAL
