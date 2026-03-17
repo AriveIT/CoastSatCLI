@@ -231,10 +231,17 @@ def extract_shorelines(metadata, settings, print_errors=False):
         plt.close()
 
     output = SDS_tools.merge_output(output)
+    output = SDS_tools.remove_duplicates(output)
+    output = SDS_tools.remove_inaccurate_georef(output, 10)
+
+    output_kdtrees = output["cloud_kdtrees"]
+    del(output["cloud_kdtrees"])
 
     filepath = filepath_data
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)
+    with open(os.path.join(filepath, sitename + '_cloud_kdtrees.pkl'), 'wb') as f:
+        pickle.dump(output_kdtrees, f)
 
     return output
 

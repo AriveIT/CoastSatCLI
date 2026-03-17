@@ -122,9 +122,9 @@ def load_cached_output(settings: Dict[str, Any], cache_enabled: bool = True) -> 
 
 
 def run_detection(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
-    output = SDS_shoreline.extract_shorelines(metadata, settings) # this also saves <sitename>_output.pkl and shorelines.kml
-    output = SDS_tools.remove_duplicates(output)
-    output = SDS_tools.remove_inaccurate_georef(output, 10)
+    # this saves <sitename>_output.pkl and shorelines.kml
+    # and removes duplicates and inaccurate georefs
+    output = SDS_shoreline.extract_shorelines(metadata, settings)
     return output
 
 

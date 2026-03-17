@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime, timedelta
 import pytz
 import pdb
+import pickle
+from pathlib import Path
 
 # other modules
 import skimage.transform as transform
@@ -289,6 +291,15 @@ def compute_intersection_QC(output, transects, settings):
     
     shorelines = output['shorelines']
 
+    filepath = settings["output_dir"]
+    sitename = settings["sitename"]
+    cache_path = Path(filepath) / f"{sitename}_cloud_kdtrees.pkl"
+    try:
+        with cache_path.open("rb") as f:
+            cloud_kd_trees = pickle.load(f)
+    except FileNotFoundError:
+        raise Exception("Cloud kd tree pickle file unable to load")
+    
     # pre-calculate values for cloud intersections
     t = next(iter(transects.values())) # grab some transect
     t_length = np.linalg.norm(t[-1,:] - t[0,:])
@@ -324,7 +335,7 @@ def compute_intersection_QC(output, transects, settings):
                 continue
 
             if settings.get('cluster_intersection_selection', False):
-                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], output["cloud_kdtrees"][i], query_radius, half_collider_length, settings)
+                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[i], query_radius, half_collider_length, settings)
                 transect_class = output['transect_origin_classes'][i][transect_idx]
                 clusters, centroids, c_idx, c_info = cluster_intersection_selection(
                     intersections = intersections[~np.isnan(intersections)],
@@ -411,7 +422,7 @@ def compute_intersection_QC(output, transects, settings):
 
         if settings.get("plot_n_clusters", False) and settings.get('cluster_intersection_selection', False):
             transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
-            plot_n_clusters(cross_dist[key], output['dates'], n_cluster, transect_classes, key, settings['transect_plot_dir'])
+            plot_n_clusters(cross_dist[key], output['dates'], n_cluster, transect_classes, key, settings['output_dir'])
 
         # plot for troubleshooting
         # if settings['plot_fig']:
@@ -690,7 +701,7 @@ def plot_clustering_intersections(intersections, key, sl, transect, transect_cla
     fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
     
     # save plot
-    filepath = f"{settings['transect_plot_dir']}\\{key}_intersection_plots"
+    filepath = f"{settings['output_dir']}\\{key}_intersection_plots"
     if not os.path.exists(filepath):
                 os.mkdir(filepath)
     fig.savefig(f"{filepath}\\{key}_{date}.png")
