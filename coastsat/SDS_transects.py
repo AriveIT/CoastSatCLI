@@ -174,272 +174,7 @@ def draw_transects(output, settings):
 # COMPUTE INTERSECTIONS
 ###################################################################################################
 
-def compute_intersection(output, transects, settings):
-    """
-    Computes the intersection between the 2D shorelines and the shore-normal.
-    transects. It returns time-series of cross-shore distance along each transect.
-    
-    KV WRL 2018       
-    Arguments:
-    -----------
-    output: dict
-        contains the extracted shorelines and corresponding metadata
-    transects: dict
-        contains the X and Y coordinates of each transect
-    settings: dict with the following keys
-        'along_dist': int
-            alongshore distance considered caluclate the intersection
-              
-    Returns:    
-    -----------
-    cross_dist: dict
-        time-series of cross-shore distance along each of the transects. 
-        Not tidally corrected.        
-    """    
-    
-    # loop through shorelines and compute the median intersection    
-    intersections = np.zeros((len(output['shorelines']),len(transects)))
-    for i in range(len(output['shorelines'])):
-
-        sl = output['shorelines'][i]
-        
-        for j,key in enumerate(list(transects.keys())): 
-            
-            # compute rotation matrix
-            X0 = transects[key][0,0]
-            Y0 = transects[key][0,1]
-            temp = np.array(transects[key][-1,:]) - np.array(transects[key][0,:])
-            phi = np.arctan2(temp[1], temp[0])
-            Mrot = np.array([[np.cos(phi), np.sin(phi)],[-np.sin(phi), np.cos(phi)]])
-    
-            # calculate point to line distance between shoreline points and the transect
-            p1 = np.array([X0,Y0])
-            p2 = transects[key][-1,:]
-            d_line = np.abs(np.cross(p2-p1,sl-p1)/np.linalg.norm(p2-p1))
-            # calculate the distance between shoreline points and the origin of the transect
-            d_origin = np.array([np.linalg.norm(sl[k,:] - p1) for k in range(len(sl))])
-            # find the shoreline points that are close to the transects and to the origin
-            # the distance to the origin is hard-coded here to 1 km 
-            idx_dist = np.logical_and(d_line <= settings['along_dist'], d_origin <= 200)
-            # find the shoreline points that are in the direction of the transect (within 90 degrees)
-            temp_sl = sl - np.array(transects[key][0,:])
-            phi_sl = np.array([np.arctan2(temp_sl[k,1], temp_sl[k,0]) for k in range(len(temp_sl))])
-            diff_angle = (phi - phi_sl)
-            idx_angle = np.abs(diff_angle) < np.pi/2
-            # combine the transects that are close in distance and close in orientation
-            idx_close = np.where(np.logical_and(idx_dist,idx_angle))[0]     
-            
-            # in case there are no shoreline points close to the transect 
-            if len(idx_close) == 0:
-                intersections[i,j] = np.nan
-            else:
-                # change of base to shore-normal coordinate system
-                xy_close = np.array([sl[idx_close,0],sl[idx_close,1]]) - np.tile(np.array([[X0],
-                                   [Y0]]), (1,len(sl[idx_close])))
-                xy_rot = np.matmul(Mrot, xy_close)
-                # compute the median of the intersections along the transect
-                intersections[i,j] = np.nanmedian(xy_rot[0,:])
-    
-    # fill the a dictionnary
-    cross_dist = dict([])
-    for j,key in enumerate(list(transects.keys())): 
-        cross_dist[key] = intersections[:,j]   
-    
-    return cross_dist
-
 def compute_intersection_QC(output, transects, settings):
-    """
-    More advanced function to omputes the intersection between the 2D mapped shorelines 
-    and the transects. Produces more quality-controlled time-series of shoreline change.
-    
-    Arguments:
-    -----------
-        output: dict
-            contains the extracted shorelines and corresponding dates.
-        transects: dict
-            contains the X and Y coordinates of the transects (first and last point needed for each
-            transect).
-        settings: dict
-                'along_dist': int (in metres)
-                    alongshore distance to caluclate the intersection (median of points 
-                    within this distance). 
-                'min_points': int 
-                    minimum number of shoreline points to calculate an intersections
-                'max_std': int (in metres)
-                    maximum std for the shoreline points when calculating the median, 
-                    if above this value then NaN is returned for the intersection
-                'max_range': int (in metres)
-                    maximum range  for the shoreline points when calculating the median, 
-                    if above this value then NaN is returned for the intersection
-                'min_chainage': int (in metres)
-                    furthest landward of the transect origin that an intersection is 
-                    accepted, beyond this point a NaN is returned
-                'multiple_inter': mode for removing outliers ('auto', 'nan', 'max')
-                'auto_prc': percentage to use in 'auto' mode to switch from 'nan' to 'max'
-                'd_origin_threshold': distance a shoreline points can be from transect origin and be counted as an intersection
-                        
-    Returns:    
-    -----------
-        cross_dist: dict
-            time-series of cross-shore distance along each of the transects. These are not tidally 
-            corrected.
-        
-    """      
-    
-    # initialise dictionary with intersections for each transect
-    cross_dist = dict([])
-    
-    shorelines = output['shorelines']
-
-    filepath = settings["output_dir"]
-    sitename = settings["sitename"]
-    cache_path = Path(filepath) / f"{sitename}_cloud_kdtrees.pkl"
-    try:
-        with cache_path.open("rb") as f:
-            cloud_kd_trees = pickle.load(f)
-    except FileNotFoundError:
-        raise Exception("Cloud kd tree pickle file unable to load")
-    
-    # pre-calculate values for cloud intersections
-    t = next(iter(transects.values())) # grab some transect
-    t_length = np.linalg.norm(t[-1,:] - t[0,:])
-    half_collider_length = (t_length + settings["past_dist"] - settings["min_chainage"]) / 2
-    query_radius = np.sqrt(half_collider_length ** 2 + settings["along_dist"] ** 2) # distance from collider center to collider corner
-
-    # loop through each transect
-    n = len(transects.keys())
-    for transect_idx, key in enumerate(transects.keys()):
-        print(f'\rProcessing {key} out of {str(n)}...', end='')
-        
-        # initialise variables
-        std_intersect = np.full(len(shorelines), np.nan)
-        med_intersect = np.full(len(shorelines), np.nan)
-        max_intersect = np.full(len(shorelines), np.nan)
-        min_intersect = np.full(len(shorelines), np.nan)
-        prc_intersect = np.full(len(shorelines), np.nan)
-        n_intersect = np.full(len(shorelines), np.nan)
-
-        n_cluster = np.full(len(shorelines), np.nan)
-
-        # ema = np.nan # exponential moving average
-        # alpha = 0.1 # how much to weight most recent centroid
-        bad_intersection_count = 0
-
-        # loop through each shoreline
-        for i in range(len(shorelines)):
-            
-            sl = shorelines[i]
-            intersections = get_intersections(transects[key], sl, settings)
-
-            if intersections is None:
-                continue
-
-            if settings.get('cluster_intersection_selection', False):
-                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[i], query_radius, half_collider_length, settings)
-                transect_class = output['transect_origin_classes'][i][transect_idx]
-                clusters, centroids, c_idx, c_info = cluster_intersection_selection(
-                    intersections = intersections[~np.isnan(intersections)],
-                    clustering_threshold = settings['clustering_threshold'],
-                    transect_class = transect_class,
-                    cloud_min_max = cloud_min_max
-                )
-                
-                # plot intersections and other clustering alg related info
-                if key in settings.get('transects_to_plot', []):
-                    plot_clustering_intersections(intersections, key, sl, transects[key], transect_class,
-                            centroids, c_idx, c_info, cloud_min_max, cloud_points, str(output['dates'][i])[:10], settings)
-
-                # if no cluster selected
-                if c_info < 0:
-                    bad_intersection_count += 1
-                    continue
-                
-                # not sure if ema is useful yet, probably better to leave outlier handling for when can view entire time series
-                # ema = update_ema(ema, alpha, centroids[c_idx])
-                intersections = clusters[c_idx] # update intersections to just selected cluster
-                n_cluster[i] = len(clusters)
-
-                
-
-            # compute std, median, max, min of the intersections (for current transect-shoreline pair)
-            std_intersect[i] = np.nanstd(intersections)
-            med_intersect[i] = np.nanmedian(intersections)
-            max_intersect[i] = np.nanmax(intersections)
-            min_intersect[i] = np.nanmin(intersections)
-            prc_intersect[i] = np.nanpercentile(intersections, settings['min_prc'])
-            n_intersect[i] = np.sum(~np.isnan(intersections))  # count only non-nan values
-
-                
-        # quality control the intersections using dispersion metrics (std and range)
-        condition1 = std_intersect <= settings['max_std']
-        condition2 = (max_intersect - min_intersect) <= settings['max_range']
-        condition3 = n_intersect >= settings['min_points']
-        idx_good = np.logical_and(np.logical_and(condition1, condition2), condition3)
-        # print(sum(~idx_good), bad_intersection_count)
-
-        # save copy for QA plot later
-        # med_intersect_temp = med_intersect.copy()
-        # max_intersect_temp = max_intersect.copy()
-        
-        # decide what to do with the intersections with high dispersion 
-        if settings['multiple_inter'] == 'auto':
-            # compute the percentage of data points where the std is larger than the user-defined max
-            prc_over = np.sum(std_intersect > settings['max_std'])/len(std_intersect)
-            # if more than a certain percentage is above, use the maximum intersection
-            if prc_over > settings['auto_prc']:
-                med_intersect[~idx_good] = max_intersect[~idx_good]
-                med_intersect[~condition3] = np.nan
-                n_cluster[~idx_good] = np.nan
-            # otherwise put a nan
-            else:
-                med_intersect[~idx_good] = np.nan
-                n_cluster[~idx_good] = np.nan
-                
-        elif settings['multiple_inter'] == 'max':
-            med_intersect[~idx_good] = max_intersect[~idx_good]
-            med_intersect[~condition3] = np.nan
-            n_cluster[~idx_good] = np.nan
-            prc_over = 0
-            
-        elif settings['multiple_inter'] == 'nan':
-            med_intersect[~idx_good] = np.nan
-            n_cluster[~idx_good] = np.nan
-            prc_over = 0
-
-        elif settings['multiple_inter'] == 'min':
-            med_intersect[~idx_good] = prc_intersect[~idx_good]
-            med_intersect[~condition3] = np.nan
-            n_cluster[~idx_good] = np.nan
-            prc_over = 0
-
-        
-        else:
-            raise Exception('the multiple_inter parameter can only be: nan, max or auto')
-
-        
-        # store in dict
-        cross_dist[key] = med_intersect
-
-        if settings.get("plot_n_clusters", False) and settings.get('cluster_intersection_selection', False):
-            transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
-            plot_n_clusters(cross_dist[key], output['dates'], n_cluster, transect_classes, key, settings['output_dir'])
-
-        # plot for troubleshooting
-        # if settings['plot_fig']:
-        #     fig,ax=plt.subplots(1,1,figsize=[12,4])
-        #     fig.set_tight_layout(True)
-        #     ax.grid(linestyle=':', color='0.5')
-        #     ax.plot(output['dates'], med_intersect_temp, 'o-', c='0.6', ms=3, label='median')
-        #     ax.plot(output['dates'], max_intersect_temp, 'o-', c='g', ms=3, label='max')        
-        #     ax.plot(output['dates'], cross_dist[key], 'o', c='r', ms=3, label='final')
-        #     ax.set_title('%s - %.2f'%(key, prc_over))
-        #     ax.legend(loc=3)
-        #     print('%s  - removed %d'%(key, sum(np.isnan(med_intersect))))
-
-    print()
-    return cross_dist
-
-def compute_intersection_QC_V2(output, transects, settings):
     """
     More advanced function to omputes the intersection between the 2D mapped shorelines 
     and the transects. Produces more quality-controlled time-series of shoreline change.
@@ -491,9 +226,9 @@ def compute_intersection_QC_V2(output, transects, settings):
     max_intersect = init_var()
     min_intersect = init_var()
     n_intersect = init_var()
-    n_cluster = init_var()
 
-    rejection_counts = np.zeros((len(transects.keys()), 7)) # 7 possible reasons an intersection is rejected
+    n_cluster = init_var()
+    rejection_counts = init_var()
 
     # loop through each shoreline
     n = len(shorelines)
@@ -514,7 +249,7 @@ def compute_intersection_QC_V2(output, transects, settings):
             intersections = get_intersections(transects[key], sl, settings)
 
             if intersections is None:
-                update_rejection_counts(rejection_counts[transect_idx], 7) # 7 means no intersections
+                rejection_counts[sl_idx, transect_idx] = 7 # 7 means no intersections
                 continue
 
             if settings.get('cluster_intersection_selection', False):
@@ -535,7 +270,7 @@ def compute_intersection_QC_V2(output, transects, settings):
 
                 # if no cluster selected
                 if c_info < 0:
-                    update_rejection_counts(rejection_counts[transect_idx], abs(c_info))
+                    rejection_counts[sl_idx, transect_idx] = abs(c_info)
                     continue
                 
                 intersections = clusters[c_idx] # update intersections to just selected cluster
@@ -549,7 +284,7 @@ def compute_intersection_QC_V2(output, transects, settings):
             n_intersect[sl_idx, transect_idx] = np.sum(~np.isnan(intersections))  # count only non-nan values
            
     # quality control the intersections using dispersion metrics (std and range)
-    n_nan_before = np.sum(np.isnan(med_intersect), axis=0)
+    nan_before = np.isnan(med_intersect)
     condition1 = std_intersect <= settings['max_std']
     condition2 = (max_intersect - min_intersect) <= settings['max_range']
     condition3 = n_intersect >= settings['min_points']
@@ -557,7 +292,7 @@ def compute_intersection_QC_V2(output, transects, settings):
     
     med_intersect[~idx_good] = np.nan
     n_cluster[~idx_good] = np.nan
-    n_nan_after = np.sum(np.isnan(med_intersect), axis=0)
+    nan_after = np.isnan(med_intersect)
 
     # save intersections for each transect in dictionary
     cross_dist = {key: med_intersect[:,transect_idx] for transect_idx, key in enumerate(transects.keys())}
@@ -570,8 +305,9 @@ def compute_intersection_QC_V2(output, transects, settings):
 
     # plot why intersections were rejected for each transect
     if settings.get("plot_rejection_counts", False) and settings.get('cluster_intersection_selection', False):
-        rejection_counts[:,5] = n_nan_after - n_nan_before # rejections from dispersion metrics
-        plot_rejection_counts(rejection_counts, len(shorelines), settings['output_dir'])
+        dispersion_rejections = np.logical_and(nan_after, ~nan_before)
+        rejection_counts[dispersion_rejections] = 6
+        plot_rejection_counts(rejection_counts, settings['output_dir'])
 
     print()
     return cross_dist
@@ -937,18 +673,9 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     os.makedirs(f"{dir}\\n_clusters", exist_ok=True)
     fig.savefig(f"{dir}\\n_clusters\\{transect_key}_n_clusters.png")
     plt.close(fig)
+    
 
-# 1: unclassified transect
-# 2: centroid in cloud
-# 3: cloud preferred over shoreline
-# 4: 2 clusters + cloud
-# 5: >2 clusters
-# 6: dispersion metrics
-# 7: no intersections
-def update_rejection_counts(rejection_counts, c_info):
-    rejection_counts[c_info - 1] += 1
-
-def plot_rejection_counts(rejection_counts, n_shorelines, dir):
+def plot_rejection_counts(rejection_counts, dir):
     reasons = [
         "unclassified transect",
         "centroid in cloud",
@@ -958,28 +685,55 @@ def plot_rejection_counts(rejection_counts, n_shorelines, dir):
         "dispersion metrics",
         "no intersections",
     ]
-    n_transects = rejection_counts.shape[0]
+    n_sl = rejection_counts.shape[0]
+    n_t = rejection_counts.shape[1]
 
-    reason_counts = {reason: rejection_counts[:,idx] for reason, idx in zip(reasons, range(len(reasons)))}
+    sl_unique = count_unique_per_row(rejection_counts, len(reasons))
+    t_unique = count_unique_per_row(np.transpose(rejection_counts), len(reasons))
+
+    sl_dict = {reasons[i]: sl_unique[:,i] for i in range(len(reasons))}
+    t_dict = {reasons[i]: t_unique[:,i] for i in range(len(reasons))}
+
+    plot_rejection_counts_helper("transect", "shoreline", n_t, n_sl, t_dict, dir)
+    plot_rejection_counts_helper("shoreline", "transect", n_sl, n_t, sl_dict, dir)
+
+def plot_rejection_counts_helper(type, other, n_type, n_other, reasons_dict, dir):
 
     fig, ax = plt.subplots(figsize=(12,8))
-    fig.suptitle("Rejection counts for each transect")
-    ax.set_xlabel("Transect Index")
-    ax.set_ylabel("Counts")
-    bottom = np.zeros(n_transects)
-    x_pos = np.arange(1, n_transects + 1) # generated transect labels start at 1
+    fig.suptitle(f"Rejection counts for each {type}")
+    ax.set_xlabel(f"{type} index")
+    ax.set_ylabel("counts")
+    bottom = np.zeros(n_type)
+    x_pos = np.arange(1, n_type + 1) # generated transect labels start at 1
     width=1
 
-    for reason, count in reason_counts.items():
-        p = ax.bar(x_pos, height=count, width=width, label=reason, bottom=bottom)
+    for reason, count in reasons_dict.items():
+        _ = ax.bar(x_pos, height=count, width=width, label=reason, bottom=bottom)
         bottom += count
     
-    ax.axhline(n_shorelines, linestyle="--", color="k", label="total # shorelines")
+    ax.axhline(n_other, linestyle="--", color="k", label=f"total # {other}")
     fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=2)
     fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
 
-    fig.savefig(f"{dir}\\rejection_counts.png")
+    fig.savefig(f"{dir}\\{type}_rejection_counts.png")
     plt.close(fig)
+
+def count_unique_per_row(mat, n_lab):
+    output = np.zeros((mat.shape[0], n_lab))
+
+    for row in range(mat.shape[0]):
+        unique, counts = np.unique(mat[row,:], return_counts=True)
+
+        # remove count for nans
+        not_nan = ~np.isnan(unique)
+        unique = unique[not_nan]
+        counts = counts[not_nan]
+
+        unique = np.array(unique, dtype=np.int64) - 1
+        output[row,unique] = counts
+    
+    return output
+
 
 ###################################################################################################
 # DESPIKING/OUTLIER REMOVAL
