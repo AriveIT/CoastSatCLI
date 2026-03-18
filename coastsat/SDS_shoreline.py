@@ -234,16 +234,26 @@ def extract_shorelines(metadata, settings, print_errors=False):
     output = SDS_tools.remove_duplicates(output)
     output = SDS_tools.remove_inaccurate_georef(output, 10)
 
-    output_kdtrees = output["cloud_kdtrees"]
-    del(output["cloud_kdtrees"])
 
     filepath = filepath_data
+
+    # save cloud kdtrees in multiple files so they can be loaded separately for better memory usage
+    save_cloud_kdtrees(output["cloud_kdtrees"], 50, filepath, sitename)
+    del(output["cloud_kdtrees"])
+
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)
-    with open(os.path.join(filepath, sitename + '_cloud_kdtrees.pkl'), 'wb') as f:
-        pickle.dump(output_kdtrees, f)
 
     return output
+
+def save_cloud_kdtrees(kdtrees, trees_per_file, filepath, sitename):
+
+    os.makedirs(os.path.join(filepath, "kdtrees"), exist_ok=True)
+
+    for i in range(0, len(kdtrees), trees_per_file):
+        end = min(len(kdtrees), i+trees_per_file)
+        with open(os.path.join(filepath, "kdtrees", f'{sitename}_cloud_kdtrees_{i}_{end}.pkl'), 'wb') as f:
+            pickle.dump(kdtrees[i:end], f)
 
 def plot_cloud_masks(im_ms, cloud_mask, settings, date):
     fig, ax = plt.subplots(figsize=(12, 8), tight_layout=True)
@@ -295,6 +305,7 @@ def plot_cloud_cover_hist(cloud_covers, settings):
     ax.axvline(settings["cloud_thresh"], color='k', ls="--")
 
     # plot values above each bar
+    if not isinstance(bars, list): bars = [bars] # make sure bars is a list
     ax.bar_label(bars[-1])
     ax.legend()
 
@@ -1061,7 +1072,7 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
 
     return skip_image
 
-def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, colours, settings, plot_extra=False):
+def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, colours, settings, plot_extra=True):
     """
     plots three given images together with shorelines
     plot_extra: plots images again beside without shoreline (to see values that shoreline covers)

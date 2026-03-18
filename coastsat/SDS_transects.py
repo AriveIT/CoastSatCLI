@@ -475,7 +475,7 @@ def compute_intersection_QC_V2(output, transects, settings):
         
     """
     shorelines = output['shorelines']
-    cloud_kd_trees = load_cloud_kd_trees(settings)
+    trees_per_file = 50
     
     # pre-calculate values for cloud intersections
     t = next(iter(transects.values())) # grab some transect
@@ -493,13 +493,20 @@ def compute_intersection_QC_V2(output, transects, settings):
     n_intersect = init_var()
     n_cluster = init_var()
 
-    rejection_counts = np.zeros((len(transects.keys()), 7)) # 7 possible counts an intersection is rejected
+    rejection_counts = np.zeros((len(transects.keys()), 7)) # 7 possible reasons an intersection is rejected
 
     # loop through each shoreline
     n = len(shorelines)
+    last_kd_tree_idx = 0
+    cloud_kd_trees = load_cloud_kd_trees(settings, last_kd_tree_idx, trees_per_file, n)
     for sl_idx in range(len(shorelines)):
         print(f'\rProcessing shoreline {sl_idx + 1} out of {str(n)}...', end='')
         sl = shorelines[sl_idx]
+
+        cur = sl_idx // trees_per_file
+        if cur != last_kd_tree_idx:
+            cloud_kd_trees = load_cloud_kd_trees(settings, cur, trees_per_file, n)
+            last_kd_tree_idx = cur
 
         # loop through each transect
         for transect_idx, key in enumerate(transects.keys()):
@@ -511,7 +518,8 @@ def compute_intersection_QC_V2(output, transects, settings):
                 continue
 
             if settings.get('cluster_intersection_selection', False):
-                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[sl_idx], query_radius, half_collider_length, settings)
+                cloud_idx = sl_idx - trees_per_file * last_kd_tree_idx
+                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[cloud_idx], query_radius, half_collider_length, settings)
                 transect_class = output['transect_origin_classes'][sl_idx][transect_idx]
                 clusters, centroids, c_idx, c_info = cluster_intersection_selection(
                     intersections = intersections[~np.isnan(intersections)],
@@ -611,15 +619,19 @@ def get_intersections(transect, sl, settings):
 
     return xy_rot[0,:]
 
-def load_cloud_kd_trees(settings):
-    filepath = settings["output_dir"]
-    sitename = settings["sitename"]
-    cache_path = Path(filepath) / f"{sitename}_cloud_kdtrees.pkl"
+
+def load_cloud_kd_trees(settings, idx, trees_per_file, n_shorelines):
+    start = idx * trees_per_file
+    end = min((idx + 1) * trees_per_file, n_shorelines)
+    fn = f"{settings['sitename']}_cloud_kdtrees_{start}_{end}.pkl"
+
+    cache_path = Path(settings["output_dir"]) / "kdtrees" / fn
+
     try:
         with cache_path.open("rb") as f:
             cloud_kd_trees = pickle.load(f)
     except FileNotFoundError:
-        raise Exception("Cloud kd tree pickle file unable to load")
+        raise Exception(f"Cloud kd tree pickle file {fn} in {cache_path} unable to load")
     return cloud_kd_trees
 
 def update_ema(ema, alpha, new_value):
@@ -846,6 +858,7 @@ def plot_clustering_intersections(intersections, key, sl, transect, transect_cla
     if not os.path.exists(filepath):
                 os.mkdir(filepath)
     fig.savefig(f"{filepath}\\{key}_{date}.png")
+    plt.close(fig)
 
 
 def get_points_along_transect(p0, p1, points):
@@ -923,6 +936,7 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     # save
     os.makedirs(f"{dir}\\n_clusters", exist_ok=True)
     fig.savefig(f"{dir}\\n_clusters\\{transect_key}_n_clusters.png")
+    plt.close(fig)
 
 # 1: unclassified transect
 # 2: centroid in cloud
@@ -965,6 +979,7 @@ def plot_rejection_counts(rejection_counts, n_shorelines, dir):
     fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
 
     fig.savefig(f"{dir}\\rejection_counts.png")
+    plt.close(fig)
 
 ###################################################################################################
 # DESPIKING/OUTLIER REMOVAL
@@ -1068,6 +1083,7 @@ def reject_outliers(cross_distance, output, settings):
             ax[1].set(ylabel='distance [m]',
                       title= 'Post-processed time-series - %d points' % (len(chainage3)))
             fig.savefig(f"{settings['plot_dir']}\\outlier_rejection\\{key}_outlier_rejection.png")
+            plt.close(fig)
 
     return chain_dict
 
