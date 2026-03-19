@@ -762,6 +762,7 @@ def reject_outliers(cross_distance, output, settings):
     """
     
     chain_dict = dict([])
+    outlier_stats = np.zeros((3, len(cross_distance.keys()))) # track good, spike, otsu counts
 
     print("Cleaning time series data (removing outliers)...")
 
@@ -811,6 +812,7 @@ def reject_outliers(cross_distance, output, settings):
             output_dates_trimmed = output['dates']
         idx_kept = [date in dates3 for date in output_dates_trimmed]
         chainage[~np.array(idx_kept)] = np.nan
+
         # store in chain_dict
         chain_dict[key] = chainage
         
@@ -838,6 +840,13 @@ def reject_outliers(cross_distance, output, settings):
                       title= 'Post-processed time-series - %d points' % (len(chainage3)))
             fig.savefig(f"{settings['plot_dir']}\\outlier_rejection\\{key}_outlier_rejection.png")
             plt.close(fig)
+
+        outlier_stats[0, i] = len(chainage3) # points in post-processed time-series
+        outlier_stats[1, i] = len(chainage2) - len(chainage3) # spike
+        outlier_stats[2, i] = len(chainage1) - len(chainage2) # otsu
+
+    if settings['plot_fig']:
+        plot_outlier_counts(outlier_stats, len(output['dates']), settings['plot_dir'])
 
     return chain_dict
 
@@ -953,6 +962,35 @@ def identify_outliers(chainage, dates, cross_change, debug=False):
      
     # return the time-series where the outliers have been removed
     return chainage_temp, dates_temp
+
+def plot_outlier_counts(outlier_stats, n_sl, dir):
+    labels = ["good", "spike", "otsu"]
+    colours = ["C0", "C3", "C2"] # consistency with other outlier plots
+    n_transects = outlier_stats.shape[1]
+
+    mean_outliers = np.sum(outlier_stats[[1, 2],:]) / n_transects
+    outlier_percentage = np.sum(outlier_stats[[1, 2],:]) / np.sum(outlier_stats)
+
+
+    fig, ax = plt.subplots(figsize=(12,8))
+    fig.suptitle(f"Outlier rejection counts for each transect", fontsize=18)
+    ax.set_title(f"Average # outliers: {mean_outliers:.3f}, Percentage of outlier: {outlier_percentage:.3f}", fontsize=10)
+    ax.set_xlabel(f"transect index")
+    ax.set_ylabel("counts")
+    bottom = np.zeros(n_transects)
+    x_pos = np.arange(1, n_transects + 1) # generated transect labels start at 1
+    width=1
+
+    for label, colour, counts in zip(labels, colours, outlier_stats):
+        _ = ax.bar(x_pos, height=counts, width=width, label=label, bottom=bottom, color=colour)
+        bottom += counts
+    ax.axhline(n_sl, linestyle="--", color="k", label=f"total # shorelines")
+
+    fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=2)
+    fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
+
+    fig.savefig(f"{dir}\\outlier_rejection_counts.png")
+    plt.close(fig)
 
 ###################################################################################################
 # SEASONAL/MONTHLY AVERAGING
