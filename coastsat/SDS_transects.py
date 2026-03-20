@@ -253,8 +253,12 @@ def compute_intersection_QC(output, transects, settings):
                 continue
 
             if settings.get('cluster_intersection_selection', False):
-                cloud_idx = sl_idx - trees_per_file * last_kd_tree_idx
-                cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[cloud_idx], query_radius, half_collider_length, settings)
+                if settings.get('cloud_filtering', True):
+                    cloud_idx = sl_idx - trees_per_file * last_kd_tree_idx
+                    cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[cloud_idx], query_radius, half_collider_length,
+                                                                    settings['min_points'], settings)
+                else:
+                    cloud_min_max, cloud_points = None, None
                 transect_class = output['transect_origin_classes'][sl_idx][transect_idx]
                 clusters, centroids, c_idx, c_info = cluster_intersection_selection(
                     intersections = intersections[~np.isnan(intersections)],
@@ -262,7 +266,7 @@ def compute_intersection_QC(output, transects, settings):
                     transect_class = transect_class,
                     cloud_min_max = cloud_min_max
                 )
-                
+
                 # plot intersections and other clustering alg related info
                 if key in settings.get('transects_to_plot', []):
                     plot_clustering_intersections(intersections, key, sl, transects[key], transect_class,
@@ -283,7 +287,7 @@ def compute_intersection_QC(output, transects, settings):
             min_intersect[sl_idx, transect_idx] = np.nanmin(intersections)
             n_intersect[sl_idx, transect_idx] = np.sum(~np.isnan(intersections))  # count only non-nan values
            
-    # quality control the intersections using dispersion metrics (std and range)
+    # quality control the intersections using dispersion metrics (std and range) and # points
     nan_before = np.isnan(med_intersect)
     condition1 = std_intersect <= settings['max_std']
     condition2 = (max_intersect - min_intersect) <= settings['max_range']
@@ -303,7 +307,7 @@ def compute_intersection_QC(output, transects, settings):
             transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
             plot_n_clusters(cross_dist[key], output['dates'], n_cluster[:,0], transect_classes, key, settings['output_dir'])
 
-    # plot why intersections were rejected for each transect
+    # plot why intersections were rejected for each transect and shoreline
     if settings.get("plot_rejection_counts", False) and settings.get('cluster_intersection_selection', False):
         dispersion_rejections = np.logical_and(nan_after, ~nan_before)
         rejection_counts[dispersion_rejections] = 6
@@ -332,7 +336,7 @@ def get_intersections(transect, sl, settings):
     # find the shoreline points that are close to the transects and to the origin
     # the distance to the origin is hard-coded here to 1 km 
     search_limit = np.linalg.norm(p1 - p0) + settings['past_dist']
-    idx_dist = np.logical_and(d_line <= settings['along_dist'], d_origin <= search_limit)
+    idx_dist = np.logical_and(d_line <= settings['along_dist'], d_origin <= search_limit) # note: this technically gives the collider a rounded end
     idx_close = np.where(idx_dist)[0]
     
     # if no shoreline points close to the transect 
@@ -408,12 +412,13 @@ def cluster_intersection_selection(intersections, clustering_threshold, transect
         # check if any centroids are inside cloud
         centroids_in_cloud = np.any(np.logical_and(centroids > cloud_min_max[0], centroids < cloud_min_max[1]))
         if centroids_in_cloud:
-            return clusters, centroids, -1, -2     
+            return clusters, centroids, -1, -2    
+
+        cloud_centroid = (cloud_min_max[0] + cloud_min_max[1]) / 2 
 
         if len(clusters) == 1:
 
             # see if imaginary cloud covered shoreline would be preferred
-            cloud_centroid = (cloud_min_max[0] + cloud_min_max[1]) / 2
 
             # centroids have to be in increasing order
             if cloud_centroid < centroids[0]:
@@ -423,15 +428,31 @@ def cluster_intersection_selection(intersections, clustering_threshold, transect
                 temp_centroids = np.array([centroids[0], cloud_centroid]) 
                 cloud_idx = 1
             
-            centroid_idx = select_centroid(temp_centroids, transect_class)
+            centroid_idx = select_centroid_2(temp_centroids, transect_class)
             
-            if centroid_idx == cloud_idx: return None, None, -1, -3 # skip intersection if cloud preferred 
-            else: return clusters, centroids, 0, 1 # if shoreline is preferred, we're good to go
+            if centroid_idx == cloud_idx: return clusters, centroids, -1, -3 # skip intersection if cloud preferred 
+            else: return clusters, centroids, 0, 1 # if shoreline is preferred, return 0 as idx (there's only one shoreline)
         
         # 2 clusters + cloud = potentially 3 shorelines --> ambiguous case
         # here for clarity and more detailed info
         if len(clusters) == 2:
-            return clusters, centroids, -1, -4
+
+            cloud_idx = np.searchsorted(centroids, cloud_centroid)
+            temp_centroids = np.insert(centroids, cloud_idx, cloud_centroid)
+            centroid_idx = select_centroid_3(temp_centroids, transect_class) # returns None or 1
+            
+            # if ambiguous case
+            if centroid_idx == None:
+                return clusters, centroids, -1, -4
+            
+            # if cloud covers middle shoreline (cloud is preferred)
+            if cloud_idx == 1:
+                return clusters, centroids, -1, -3
+            
+            # it is not an ambiguous case, and shoreline is preferred, return middle shoreline
+            if cloud_idx == 0: return clusters, centroids, 0, 1
+            else: return clusters, centroids, 1, 1
+
 
     else:
 
@@ -439,10 +460,10 @@ def cluster_intersection_selection(intersections, clustering_threshold, transect
             return clusters, centroids, 0, 1
         
         if len(clusters) == 2:
-            centroid_idx = select_centroid(centroids, transect_class)
+            centroid_idx = select_centroid_2(centroids, transect_class)
             return clusters, centroids, centroid_idx, 1
     
-    # if more >2  clusters, picking shoreline becomes slightly ambiguous in some cases
+    # if more >2  clusters, picking shoreline becomes ambiguous in some cases
     # if 3 clusters is a common case (and consistently not noise), should consider adding handling
     return clusters, centroids, -1, -5
     
@@ -459,15 +480,34 @@ def cluster1d(intersections, threshold):
 # transect_class = 1 --> transect origin is on water
 # assumes exactly 2 centroids, and transect classes are valid (0 or 1)
 # determines which shoreline to pick (first or second centroid)
+# i.e. the shoreline facing the same direction as the transect
 # assumes centroids are in increasing order
 # basically just a behaviour tree
-def select_centroid(centroids, transect_class):
+def select_centroid_2(centroids, transect_class):
     return int(np.logical_xor(transect_class, np.logical_xor(centroids[0] > 0, centroids[1] > 0)))
+
+# select centroid from list of 3 centroids/shorelines
+# only applied to 2 SL + cloud case, since we're pretending the cloud is covering a real shoreline
+# otherwise, 3 SL case is too often noise
+def select_centroid_3(centroids, transect_class):
+    if centroids[1] > 0:
+        selection = select_centroid_2(centroids[:2], transect_class)
+        offset = 0
+    else:
+        selection = select_centroid_2(centroids[1:], transect_class)
+        offset = 1
+    
+    # if middle shoreline is preferred, return that
+    # otherwise, 2 shorelines are facing the correct direction so selection is ambiguous
+    if selection + offset == 1:
+        return 1
+    else:
+        return None
 
 # could move no label transect check before cloud intersection calculation (nice to have plots tho)
 
 # returns the minimum and maximum intersections of given cloud and transect
-def get_cloud_min_max(transect, cloud_tree, query_radius, half_collider_length, settings):
+def get_cloud_min_max(transect, cloud_tree, query_radius, half_collider_length, min_points, settings):
 
     collider_center = get_collider_center(transect, settings["min_chainage"], half_collider_length)
     cloud_indices = cloud_tree.query_ball_point(collider_center, query_radius)
@@ -476,14 +516,13 @@ def get_cloud_min_max(transect, cloud_tree, query_radius, half_collider_length, 
 
     cloud_coords = cloud_tree.data[cloud_indices]
     intersections = get_intersections(transect, cloud_coords, settings)
-    if intersections is None:
+    if intersections is None or len(intersections) < min_points:
         return None, None
 
-    # probably a clumsy way of getting resolution, but doesn't need to know satellite
-    resolution = 30 # resolution in worst case (L5)
-    buffer = resolution * 0.707 # ~root(2) / 2 --> distance from pixel center to corner
+    resolution = 15 # resolution in worst case (Landsat)
+    buffer = resolution * 1.414 # ~root(2) --> distance to other corner
 
-    return (np.min(intersections) - buffer, np.max(intersections) + buffer), cloud_coords
+    return (np.nanmin(intersections) - buffer, np.nanmax(intersections) + buffer), cloud_coords
 
 def get_collider_center(transect, min_chainage, half_collider_length):
     dir = normalize(transect[-1,:] - transect[0,:])
@@ -520,17 +559,17 @@ def plot_clustering_intersections(intersections, key, sl, transect, transect_cla
     if cluster_info < 0:
         reason += "rejected: "
         if cluster_info == -1: reason += "unclassified transect"
-        elif cluster_info == -2: reason += "centroid in cloud"
-        elif cluster_info == -3: reason += "cloud preferred over shoreline"
-        elif cluster_info == -4: reason += "2 clusters + cloud"
-        elif cluster_info == -5: reason += ">2 clusters"
+        elif cluster_info == -2: reason += "sl in cloud"
+        elif cluster_info == -3: reason += "cloud preferred"
+        elif cluster_info == -4: reason += "ambiguous 2 sl + cloud"
+        elif cluster_info == -5: reason += ">2 sl"
     else:
         reason += "passed"
 
     transect_p0 = transect[0,:]
     transect_p1 = transect[-1,:]
 
-    fig, axs = plt.subplots(1, 3, figsize=(12, 8)) # 0: 1d, 1: 2d
+    fig, axs = plt.subplots(1, 3, figsize=(12, 8))
     fig.suptitle(f'{key} on {date}: {reason}')
 
     # plot intersections in 1d scatterplot
@@ -636,7 +675,7 @@ def get_plot_range(collider, buffer=10):
 
 
 def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key, dir):
-    # note: invalid classes are thrown out - therefore not plotted
+    # note: unlabelled transects are thrown out - therefore not plotted
 
     # preprocessing
     idx_not_nan = np.where(~np.isnan(n_clusters))[0]
@@ -650,7 +689,7 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     idx_2_land = np.intersect1d(idx2, idx_land)
     idx_2_water = np.intersect1d(idx2, idx_water)
 
-    pct_2_cluster = (len(idx2) / len(idx_not_nan)) * 100
+    pct_2_cluster = (len(idx2) / len(idx_not_nan)) * 100 if len(idx_not_nan) != 0 else 0
 
     # prep fig
     fig,ax=plt.subplots(1,1,figsize=[12,6], sharex=True)
@@ -969,12 +1008,14 @@ def plot_outlier_counts(outlier_stats, n_sl, dir):
     n_transects = outlier_stats.shape[1]
 
     mean_outliers = np.sum(outlier_stats[[1, 2],:]) / n_transects
+    mean_points = np.sum(outlier_stats) / n_transects
     outlier_percentage = np.sum(outlier_stats[[1, 2],:]) / np.sum(outlier_stats)
+
 
 
     fig, ax = plt.subplots(figsize=(12,8))
     fig.suptitle(f"Outlier rejection counts for each transect", fontsize=18)
-    ax.set_title(f"Average # outliers: {mean_outliers:.3f}, Percentage of outlier: {outlier_percentage:.3f}", fontsize=10)
+    ax.set_title(f"Mean # points: {mean_points:.3f}, Mean # outliers: {mean_outliers:.3f}, Percentage of outliers: {outlier_percentage:.3f}", fontsize=10)
     ax.set_xlabel(f"transect index")
     ax.set_ylabel("counts")
     bottom = np.zeros(n_transects)
