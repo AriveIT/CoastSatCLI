@@ -176,7 +176,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
             shoreline = process_shoreline(contours_mwi, cloud_mask_adv, im_nodata,
                                           georef, image_epsg, settings)
 
-            if settings['check_detection'] or settings['save_figure']:
+            if settings['check_detection'] or settings['save_detection_plots']:
                 date = filenames[i][:19]
                 if not settings['check_detection']:
                     plt.ioff()
@@ -970,7 +970,7 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
             output spatial reference system as EPSG code
         'check_detection': bool
             if True, lets user manually accept/reject the mapped shorelines
-        'save_figure': bool
+        'save_detection_plots': bool
             if True, saves a -jpg file for each mapped shoreline
 
     Returns:
@@ -1060,8 +1060,8 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
             else:
                 plt.waitforbuttonpress()
 
-    # if save_figure is True, save a .jpg under /jpg_files/detection
-    if settings['save_figure'] and not skip_image:
+    # if save_detection_plots is True, save a .jpg under /jpg_files/detection
+    if settings['save_detection_plots'] and not skip_image:
         fig.savefig(os.path.join(filepath, date + '_' + satname + '.jpg'), dpi=150)
         plt.close(fig)
 
@@ -1072,7 +1072,7 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
 
     return skip_image
 
-def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, colours, settings, plot_extra=True):
+def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, colours, settings, plot_extra=False):
     """
     plots three given images together with shorelines
     plot_extra: plots images again beside without shoreline (to see values that shoreline covers)
@@ -1225,7 +1225,7 @@ def adjust_detection(im_ms, cloud_mask, im_nodata, im_labels, im_ref_buffer, ima
             input parameters (sitename, filepath, polygon, dates, sat_list)
         'output_epsg': int
             output spatial reference system as EPSG code
-        'save_figure': bool
+        'save_detection_plots': bool
             if True, saves a -jpg file for each mapped shoreline
 
     Returns:
@@ -1447,8 +1447,8 @@ def adjust_detection(im_ms, cloud_mask, im_nodata, im_labels, im_ref_buffer, ima
         else:
             plt.waitforbuttonpress()
 
-    # if save_figure is True, save a .jpg under /jpg_files/detection
-    if settings['save_figure'] and not skip_image:
+    # if save_detection_plots is True, save a .jpg under /jpg_files/detection
+    if settings['save_detection_plots'] and not skip_image:
         fig.savefig(os.path.join(filepath, date + '_' + satname + '.jpg'), dpi=150)
 
     # don't close the figure window, but remove all axes and settings, ready for next plot

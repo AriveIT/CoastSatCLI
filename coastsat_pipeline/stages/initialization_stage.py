@@ -16,7 +16,7 @@ class InitializationStage(PipelineStage):
         inputs, analysis_settings, metadata = prepare_initial_settings(
             settings.raw,
             params.download_filters,
-            params.analysis_settings
+            params.shoreline_settings
         )
 
         context.inputs_config = inputs

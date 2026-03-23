@@ -55,14 +55,14 @@ def run_time_series_post_processing(
             trend, fitted = SDS_transects.calculate_trend(valid_dates, valid_chainage)
             processed += 1
 
-            if settings.get("save_figure", False) and options.save_seasonal_plots:
+            if options.save_seasonal_plots:
                 try:
                     _plot_seasonal_average(key, valid_dates, valid_chainage, seasonal_path)
                 except Exception as e:
                     print(e)
-            if settings.get("save_figure", False) and options.save_monthly_plots:
+            if options.save_monthly_plots:
                 _plot_monthly_average(key, valid_dates, valid_chainage, monthly_path)
-            if settings.get("save_figure", False) and options.save_ma_plots:
+            if options.save_ma_plots:
                 _plot_ma(key, valid_dates, valid_chainage, fitted, trend, ma_path)
 
         else:

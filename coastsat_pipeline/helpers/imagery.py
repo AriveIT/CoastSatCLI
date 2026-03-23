@@ -54,7 +54,7 @@ def run_batch_shoreline_detection(
 
     if options.save_geojson:
         write_geojson(output, settings)
-    if options.save_plots and settings.get("save_figure", False):
+    if options.save_plots:
         plot_mapped_shorelines(output, settings)
     return output
 

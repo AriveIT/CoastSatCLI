@@ -22,7 +22,6 @@ def run_shoreline_analysis(
     settings: Dict[str, Any],
     transect_settings: Dict[str, Any],
     outlier_settings: Dict[str, Any],
-    georef_accuracy_tolerance: float,
     options: AnalysisOptions | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
@@ -33,17 +32,13 @@ def run_shoreline_analysis(
     sitename = settings.get("inputs", {}).get("sitename", "unknown")
     logger.info("Stage 03: analyzing shorelines for site %s", sitename)
 
-    output = SDS_tools.remove_duplicates(output)
-    output = SDS_tools.remove_inaccurate_georef(output, georef_accuracy_tolerance)
-
     transects = SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"])
-
-    if settings.get("save_figure", False) and options.plot_transects:
-        _plot_shorelines_with_transects(output, transects, settings)
-
     cross_distance = _compute_cross_distance(output, transects, transect_settings, outlier_settings, settings["inputs"]["filepath"], sitename)
 
-    if settings.get("save_figure", False) and options.plot_time_series:
+    if options.plot_transects:
+        _plot_shorelines_with_transects(output, transects, settings)
+
+    if options.plot_time_series:
         _plot_time_series(output, cross_distance, settings)
 
     if options.write_csv:

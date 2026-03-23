@@ -12,8 +12,8 @@ import pytz
 @dataclass
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
-    save_plots: bool = True # plots all extracted shorelines in different colours
-    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    save_plots: bool = False # plots all extracted shorelines in different colours
+    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
     skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
@@ -21,7 +21,7 @@ class ImageryOptions:
 
 @dataclass
 class AnalysisOptions:
-    plot_transects: bool = True # plots all extracted shorelines and all transects
+    plot_transects: bool = False # plots all extracted shorelines and all transects
     plot_time_series: bool = False # saves time series of each transect (currently illegible for any reasonable number of transects)
     write_csv: bool = True # saves time series data to csv file (after outlier rejection)
 
@@ -76,7 +76,7 @@ class Parameters:
     # Note: these parameters only affect downloads. Analysis is unaffected (it is performed on anything already downloaded)
     download_filters = {
         'dates': ['1984-01-01', '2025-01-01'], #["1984-01-01", "2025-01-01"], # range of dates of aquisitions to be downloaded
-        'sat_list': ["L5", "L7", "L8", "L9"], #["L5", "L7", "L8", "L9"], # satellite missions to download images from
+        'sat_list': ["L5", "L7", "L8", "L9"], # satellite missions to download images from
         # 'excluded_epsg_codes': ['32609'], # exclude images with given epsg codes
         # 'LandsatWRS': '055022', # specify a Landsat tile (WRS path/row)
         # 'S2tile': '09UVA', # specifies an S2 tile
@@ -84,50 +84,56 @@ class Parameters:
         # 'skip_L7_SLC': True # skip L7 after Scan-Line-Correction failure
     }
 
-    analysis_settings = {
-        "cloud_thresh": 0.1, # percentage of image that can be covered by cloud
-        "dist_clouds": 300, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
-        "check_detection": False, # if True, lets user manually accept/reject the mapped shorelines
-        "adjust_detection": False, # lets user adjust the detected shorelines with a slide bar.
-        "save_figure": True, # this has to be true for ANY figures to be saved
-        "min_beach_area": 1000, # minimum number of pixels that have to be connected to belong to the SAND class
-        "min_length_sl": 500, # minimum length of shoreline perimeter to be kept (in meters)
+    shoreline_settings = {
+
+        # preprocessing
         "cloud_mask_issue": False, # switch this parameter to True if sand pixels are masked (in black) on many images
-        "sand_color": "default", # classification model: 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
         "pan_off": False, # True to switch pansharpening off for Landsat 7/8/9 imagery
         "s2cloudless_prob": 60, # Threshold to identify cloud pixels in the s2cloudless probability mask (s2 cloud mask is not 1 and 0, but a probability [0,100))
+
+        # extraction settings
+        "cloud_thresh": 0.5, # percentage of image that can be covered by cloud
+        "dist_clouds": 50, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
+        "min_length_sl": 500, # minimum length of shoreline perimeter to be kept (in meters)
         "max_dist_ref" : 250, # maximum distance from the reference shoreline in meters
+
+        # manual detection (untested)
+        "check_detection": False, # lets user manually accept/reject the mapped shorelines
+        "adjust_detection": False, # lets user adjust the detected shorelines with a slide bar.
+
+        # classifier (only used for very sandy beaches)
+        "min_beach_area": 1000, # minimum number of pixels that have to be connected to belong to the SAND class
+        "sand_color": "default", # classification model: 'default', 'latest', 'dark' (for grey/black sand beaches) or 'bright' (for white sand beaches)
+
+        # plotting
         "plot_mndwi": False, # plot histograms of MNDWI values for each image
+        "save_detection_plots": True, # plot detection (RGB, pixel classification, MNDWI, and shoreline)
     }
 
     #####################
     # Analysis
     #####################
     transect_settings = {
+
+        # collider settings
         "along_dist": 35, # how far a point can be orthogonally to transect line
         "past_dist": 300, # distance a shoreline points can be past end of transect and be counted as an intersection
+        "min_chainage": -150, # furthest landward of the transect origin that an intersection is accepted
+        
+        # dispersion thresholds
         "min_points": 3, # minimum number of points to calculate an intersections
         "max_std": 15, # maximum standard deviation of intersections per transect (exceptions are dealt with according to multiple_inter)
         "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
-        "min_chainage": -150, # furthest landward of the transect origin that an intersection is accepted
-        
-        # method of dealing with transect/shorelines with large dispersion ('auto', 'nan', 'max')
-        # nan = set values to nan
-        # max = use maximum intersection
-        # auto = if more than auto_prc% of intersections for a given transect (across shorelines) have std>max_std, use maximum intersection
-        # min = take the shore_prc th percentile
-        "multiple_inter": "nan",
 
-        # percentage to use in 'auto' mode to blend between 'nan' and 'max'
-        # auto_prc = 0.0 --> max
-        # auto_prc = 1.0 --> nan
-        "auto_prc": 0.1,
-        'min_prc': 15, # what percentile to take in "min" 
-
+        # clustering shoreline selection settings
         "cluster_intersection_selection": True, # use clustering intersection algorithm
-        "clustering_threshold": 15, # minimum gap between consecutive intersections needed to start new cluster
-        "transects_to_plot": ["transect_184", "transect_193"], # ["transect_025", "transect_050", "transect_076"], # plot all intersections for transects with these keys
-        "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
+        "clustering_threshold": 20, # minimum gap between consecutive intersections needed to start new cluster
+        "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
+        
+        # clustering shoreline selection plotting
+        "transects_to_plot": ["transect_026"], # plot all intersections for transects with these names
+        "plot_n_clusters": False, # plot number of clusters and transect class on time series for each transect
+        "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)
     }
 
     outlier_settings = {
@@ -135,9 +141,6 @@ class Parameters:
         "otsu_threshold": [-0.5, 0], # min and max intensity threshold use for contouring the shoreline
         "plot_fig": True, # display time series before and after outlier rejection for each transect
     }
-    
-    # passed to SDS_tools.remove_inaccurate_georef
-    georef_accuracy_tolerance = 10 # minimum horizontal georeferencing accuracy (metres) for a shoreline to be accepted
 
     #####################
     # Slope Estimation

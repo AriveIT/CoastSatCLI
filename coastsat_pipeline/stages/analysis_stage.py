@@ -23,7 +23,6 @@ class AnalysisStage(PipelineStage):
             settings,
             params.transect_settings,
             params.outlier_settings,
-            params.georef_accuracy_tolerance
         )
 
         context.cross_distance = cross_distance
