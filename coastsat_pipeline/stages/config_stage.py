@@ -14,6 +14,8 @@ class ConfigLoadStage(PipelineStage):
 
     def run(self, context: PipelineContext, params: Parameters) -> None:
         config_path = Path(context.config_path).expanduser().resolve()
-        settings = build_settings(config_path)
-        context.settings = settings
+
+        global_settings = build_settings(config_path, params.download_filters)
+        
+        context.global_settings = global_settings
         context.metadata["config_loaded"] = True

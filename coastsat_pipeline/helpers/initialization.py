@@ -5,55 +5,8 @@ from typing import Any, Dict, Tuple
 from coastsat import SDS_download, SDS_preprocess, SDS_tools
 
 
-def prepare_initial_settings(raw_config: Dict[str, Any], download_filters, shoreline_settings) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+def download_images(global_settings: Dict[str, Any], download_filters) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
-    Build the CoastSat inputs/settings structures using the same logic as the legacy
-    initial_settings function. Returns (inputs, settings, metadata).
+    Downloads images and returns metadata
     """
-    inputs = _build_inputs_dict(raw_config, download_filters)
-    metadata = SDS_download.retrieve_images(inputs)
-    settings = _build_analysis_settings(raw_config, inputs, shoreline_settings)
-    return inputs, settings, metadata
-
-
-def _build_inputs_dict(raw_config: Dict[str, Any], download_filters) -> Dict[str, Any]:
-    inputs_section = raw_config["inputs"]
-
-    polygon = SDS_tools.polygon_from_kml(inputs_section["aoi_path"])
-    polygon = SDS_tools.smallest_rectangle(polygon)
-
-    # information from site initialization
-    inputs = {
-        "polygon": polygon,
-        "sitename": inputs_section["sitename"],
-        "filepath": raw_config["output_dir"],
-        "reference_geojson": inputs_section["reference_shoreline"],
-        "transect_geojson": inputs_section["transects"],
-        "fes_config": inputs_section.get("fes_config"),
-        "tide_csv_path": inputs_section.get("tide_csv_path")
-    }
-    inputs.update(download_filters)
-
-    return inputs
-
-
-# add other settings to the user defined parameters listed in analysis_settings
-def _build_analysis_settings(raw_config: Dict[str, Any], inputs: Dict[str, Any], shoreline_settings: Dict[str, Any]) -> Dict[str, Any]:
-    settings = {
-        "inputs": inputs,
-        "output_epsg": raw_config["output_epsg"],
-    }
-    settings.update(shoreline_settings)
-
-    if raw_config.get("tide_filter"):
-        settings["tide_filter"] = raw_config["tide_filter"]
-
-    if "imagery_options" in raw_config:
-        settings["imagery_options"] = raw_config["imagery_options"]
-
-    settings["reference_shoreline"] = SDS_preprocess.get_reference_sl_from_geojson(
-        inputs["reference_geojson"],
-        settings["output_epsg"],
-    )
-
-    return settings
+    return SDS_download.retrieve_images({**global_settings, **download_filters})

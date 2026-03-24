@@ -13,15 +13,19 @@ class ImageryStage(PipelineStage):
     description = "Download/preprocess imagery and run shoreline detection."
 
     def run(self, context: PipelineContext, params: Parameters) -> None:
-        inputs = context.inputs_config
-        settings = context.analysis_settings
         metadata = context.metadata.get("initialization") if context.metadata else None
+        global_settings = context.require_settings()
 
-        if inputs is None or settings is None or metadata is None:
+        if metadata is None or params.shoreline_settings is None:
             raise RuntimeError(
-                "ImageryStage requires inputs_config, analysis_settings, and initialization metadata."
+                "ImageryStage requires shoreline_settigns and initialization metadata."
             )
 
-        output = run_batch_shoreline_detection(metadata, settings, inputs)
+        output = run_batch_shoreline_detection(
+            metadata,
+            global_settings,
+            params.shoreline_settings,
+        )
+
         context.shoreline_output = output
         context.metadata["imagery"] = {"metadata": metadata}

@@ -18,7 +18,7 @@ from ..parameters import SlopeOptions
 
 
 def run_slope_estimation(
-    settings: Dict[str, Any],
+    global_settings: Dict[str, Any],
     cross_distance: Dict[str, Any],
     output: Dict[str, Any],
     date_range: list,
@@ -28,21 +28,20 @@ def run_slope_estimation(
     options: SlopeOptions | None = None,
 ) -> Tuple[Dict[str, float], list[Any], np.ndarray]:
     options = options or SlopeOptions()
-    fp_slopes = os.path.join(settings["inputs"]["filepath"], options.cache_dir_name)
+    fp_slopes = os.path.join(global_settings["filepath"], options.cache_dir_name)
     os.makedirs(fp_slopes, exist_ok=True)
 
-    tide_inputs = settings["inputs"]
-    if tide_inputs.get("tide_csv_path"):
+    if global_settings.get("tide_csv_path"):
         return None, None, None
 
-    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(settings, output, date_range, tide_timestep)
+    centroid, dates_ts, tides_ts, dates_sat, tides_sat = _compute_tides(global_settings, output, date_range, tide_timestep)
 
     (
         filtered_dates_sat,
         filtered_tides_sat,
         filtered_cross_distance,
         tide_stats,
-    ) = _apply_tide_filters(settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance, output)
+    ) = _apply_tide_filters(global_settings, dates_ts, tides_ts, dates_sat, tides_sat, cross_distance, output)
 
     slope_est, cis = _estimate_slopes(
         fp_slopes,
@@ -54,15 +53,15 @@ def run_slope_estimation(
         default_slope
     )
 
-    settings["tide_filter_stats"] = {**settings.get("tide_filter_stats", {}), **tide_stats}
+    global_settings["tide_filter_stats"] = {**global_settings.get("tide_filter_stats", {}), **tide_stats}
     return slope_est, dates_sat, tides_sat
 
-def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any], date_range: list, timestep: float):
-    handlers = pyfes.load_config(settings["inputs"]["fes_config"])
+def _compute_tides(global_settings: Dict[str, Any], output: Dict[str, Any], date_range: list, timestep: float):
+    handlers = pyfes.load_config(global_settings["fes_config"])
     ocean_tide = handlers["tide"]
     load_tide = handlers["radial"]
 
-    aoi_geom = Polygon(settings["inputs"]["polygon"][0])
+    aoi_geom = Polygon(global_settings["polygon"][0])
     centroid = SDS_tools.select_valid_centroid(aoi_geom, ocean_tide, load_tide)
 
     dates_ts, tides_ts = SDS_slope.compute_tide(centroid, date_range, timestep, ocean_tide, load_tide)
@@ -80,7 +79,7 @@ def _compute_tides(settings: Dict[str, Any], output: Dict[str, Any], date_range:
 
 
 def _apply_tide_filters(
-    settings: Dict[str, Any],
+    global_settings: Dict[str, Any],
     dates_ts,
     tides_ts,
     dates_sat,
@@ -88,7 +87,7 @@ def _apply_tide_filters(
     cross_distance,
     output
 ):
-    tide_filter_cfg = settings.get("tide_filter")
+    tide_filter_cfg = global_settings.get("tide_filter")
     tide_filter_mask, tide_thresholds = _get_percentile_tide_mask(tide_filter_cfg, tides_sat, tides_ts)
 
     date_start = pytz.utc.localize(datetime(2020, 1, 1))
@@ -104,7 +103,7 @@ def _apply_tide_filters(
         print("No acquisition dates fall within the slope estimation window; removing tide filters or using all dates instead.")
 
     # use combined_mask to filter data
-    settings.setdefault("tide_filter_stats", {})["used_for_slopes"] = int(selected_indices.size)
+    global_settings.setdefault("tide_filter_stats", {})["used_for_slopes"] = int(selected_indices.size)
     filtered_dates_sat = [dates_sat[i] for i in selected_indices]
     filtered_tides_sat = tides_sat[selected_indices]
     filtered_cross_distance = {

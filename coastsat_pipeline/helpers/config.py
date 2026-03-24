@@ -5,24 +5,19 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from ..context import InputsConfig, Settings, TideConfig, TideFilterConfig
+from ..context import TideConfig, TideFilterConfig
+from coastsat import SDS_tools
 
 
-def build_settings(config_path: Path) -> Settings:
+def build_settings(config_path: Path, download_filters: Dict[str, Any]) -> Dict[str, Any]:
     """
     Load the CLI-generated config and return a fully populated Settings dataclass.
     """
-    config_data = _load_config_dict(config_path)
-    inputs_cfg = _build_inputs_config(config_data)
-    tide_cfg = _build_tide_config(config_data)
-
-    return Settings(
-        raw=config_data,
-        inputs=inputs_cfg,
-        output_dir=Path(config_data["output_dir"]),
-        output_epsg=int(config_data["output_epsg"]),
-        tide=tide_cfg,
-    )
+    config = _load_config_dict(config_path)
+    config.update(download_filters)
+    tide_cfg = _build_tide_config(config)
+    config["tide_cfg"] = tide_cfg
+    return config
 
 
 def _load_config_dict(config_path: Path) -> Dict[str, Any]:
@@ -31,26 +26,42 @@ def _load_config_dict(config_path: Path) -> Dict[str, Any]:
         config = json.load(f)
     base_dir = config_path.parent
 
+    if "output_epsg" not in config:
+        raise KeyError("settings.json must include an 'output_epsg' entry.")
+
+
     inputs_config = config.get("inputs", {})
     for key in ("aoi_path", "reference_shoreline", "transects"):
         if key in inputs_config:
             inputs_config[key] = str((base_dir / inputs_config[key]).resolve())
 
-    if "fes_config" in inputs_config:
-        inputs_config["fes_config"] = str(Path(inputs_config["fes_config"]).expanduser().resolve())
 
-    if "output_epsg" not in config:
-        raise KeyError("settings.json must include an 'output_epsg' entry.")
+    new_config = {}
+    if "fes_config" in inputs_config:
+        new_config["fes_config"] = str(Path(inputs_config["fes_config"]).expanduser().resolve())
 
     if "output_dir" in config:
-        config["output_dir"] = str((base_dir / config["output_dir"]).resolve())
+        new_config["filepath"] = str((base_dir / config["output_dir"]).resolve())
 
     tide_filter_cfg = config.get("tide_filter")
     if tide_filter_cfg is not None:
         lower, upper = _normalize_tide_filter(tide_filter_cfg)
-        config["tide_filter"] = {"lower_percentile": lower, "upper_percentile": upper}
+        new_config["tide_filter"] = {"lower_percentile": lower, "upper_percentile": upper}
 
-    return config
+    polygon = SDS_tools.polygon_from_kml(inputs_config["aoi_path"])
+    polygon = SDS_tools.smallest_rectangle(polygon)
+    
+    new_config.update({
+        "polygon": polygon,
+        "sitename": inputs_config["sitename"],
+        "reference_geojson": inputs_config["reference_shoreline"],
+        "transect_geojson": inputs_config["transects"],
+        "fes_config": inputs_config.get("fes_config"),
+        "tide_csv_path": inputs_config.get("tide_csv_path"),
+        "output_epsg": config["output_epsg"]
+    })
+
+    return new_config
 
 
 def load_settings_from_cli_config(config_path: Path) -> Dict[str, Any]:
@@ -60,17 +71,6 @@ def load_settings_from_cli_config(config_path: Path) -> Dict[str, Any]:
     Returns the normalized dict representation (with resolved paths and tide filter).
     """
     return _load_config_dict(Path(config_path))
-
-
-def _build_inputs_config(config: Dict[str, Any]) -> InputsConfig:
-    inputs = config["inputs"]
-    return InputsConfig(
-        sitename=inputs["sitename"],
-        aoi_path=Path(inputs["aoi_path"]),
-        reference_shoreline=Path(inputs["reference_shoreline"]),
-        transects=Path(inputs["transects"]),
-        shoreline_path=Path(inputs["shoreline_path"]) if inputs.get("shoreline_path") else None,
-    )
 
 
 def _build_tide_config(config: Dict[str, Any]) -> TideConfig:

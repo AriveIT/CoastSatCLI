@@ -20,14 +20,16 @@ from ..parameters import ImageryOptions
 
 def run_batch_shoreline_detection(
     metadata: Dict[str, Any],
-    settings: Dict[str, Any],
-    inputs: Dict[str, Any],
+    global_settings: Dict[str, Any],
+    shoreline_settings: Dict[str, Any],
     options: Optional[ImageryOptions] = None,
 ) -> Dict[str, Any]:
     """
     Perform batch shoreline detection and return the output dictionary.
     """
     options = options or ImageryOptions()
+
+    settings = _build_extraction_settings(global_settings, shoreline_settings)
 
     scene_metrics_manifest, scene_metrics_path = _load_scene_metrics(settings)
 
@@ -58,6 +60,20 @@ def run_batch_shoreline_detection(
         plot_mapped_shorelines(output, settings)
     return output
 
+# format global settings, shoreline settings, and reference shoreline as SDS_shoreline expects it
+def _build_extraction_settings(global_settings: Dict[str, Any], shoreline_settings: Dict[str, Any]) -> Dict[str, Any]:
+    settings = {
+        "inputs": global_settings,
+        "output_epsg": global_settings["output_epsg"],
+    }
+    settings.update(shoreline_settings)
+
+    settings["reference_shoreline"] = SDS_preprocess.get_reference_sl_from_geojson(
+        global_settings["reference_geojson"],
+        settings["output_epsg"],
+    )
+
+    return settings
 
 def preprocess_images(
     metadata: Dict[str, Any],
@@ -124,8 +140,7 @@ def load_cached_output(settings: Dict[str, Any], cache_enabled: bool = True) -> 
 def run_detection(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Dict[str, Any]:
     # this saves <sitename>_output.pkl and shorelines.kml
     # and removes duplicates and inaccurate georefs
-    output = SDS_shoreline.extract_shorelines(metadata, settings)
-    return output
+    return SDS_shoreline.extract_shorelines(metadata, settings)
 
 
 def write_geojson(output: Dict[str, Any], settings: Dict[str, Any]) -> None:

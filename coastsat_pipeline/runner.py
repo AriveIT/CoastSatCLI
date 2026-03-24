@@ -64,7 +64,7 @@ class PipelineRunner:
             last_time = t
 
         time_passed = str(datetime.timedelta(seconds = timeit.default_timer() - start_time))
-        print(f"Completed analysis for site: {context.settings.inputs.sitename} in {time_passed}")
+        print(f"Completed analysis for site: {context.global_settings['sitename']} in {time_passed}")
         
         if params.logging_level == "all":
             self.close_log_file()

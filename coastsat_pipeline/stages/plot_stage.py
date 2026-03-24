@@ -13,7 +13,7 @@ class ImprovedTransectsPlotStage(PipelineStage):
         output = context.shoreline_output
         transects = context.transects
         corrected = context.cross_distance_tidally_corrected or context.cross_distance
-        settings = context.analysis_settings
+        settings = context.global_settings
 
         if None in (output, transects, corrected, settings):
             raise RuntimeError("ImprovedTransectsPlotStage missing required context data.")

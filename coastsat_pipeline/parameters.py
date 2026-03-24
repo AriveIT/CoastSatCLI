@@ -71,7 +71,7 @@ class Parameters:
     logging_level = "params"
 
     #####################
-    # Initialization
+    # Config
     #####################
     # Note: these parameters only affect downloads. Analysis is unaffected (it is performed on anything already downloaded)
     download_filters = {
@@ -84,6 +84,9 @@ class Parameters:
         # 'skip_L7_SLC': True # skip L7 after Scan-Line-Correction failure
     }
 
+    #####################
+    # Imagery
+    #####################
     shoreline_settings = {
 
         # preprocessing
@@ -131,7 +134,7 @@ class Parameters:
         "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
         
         # clustering shoreline selection plotting
-        "transects_to_plot": ["transect_026"], # plot all intersections for transects with these names
+        "transects_to_plot": ["transect_005", "transect_026"], # plot all intersections for transects with these names
         "plot_n_clusters": False, # plot number of clusters and transect class on time series for each transect
         "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)
     }

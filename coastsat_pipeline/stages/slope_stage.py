@@ -12,7 +12,7 @@ class SlopeEstimationStage(PipelineStage):
     description = "Estimate transect slopes to support tide correction and trends."
 
     def run(self, context: PipelineContext, params: Parameters) -> None:
-        settings = context.analysis_settings
+        settings = context.global_settings
         cross_distance = context.cross_distance
         output = context.shoreline_output
 

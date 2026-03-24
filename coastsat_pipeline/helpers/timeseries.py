@@ -25,7 +25,7 @@ class TimeSeriesResult:
 
 def run_time_series_post_processing(
     transects: Dict[str, Any],
-    settings: Dict[str, Any],
+    global_settings: Dict[str, Any],
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],
     min_chainage_size: int,
@@ -33,12 +33,12 @@ def run_time_series_post_processing(
     options: TimeSeriesOptions | None = None,
 ) -> TimeSeriesResult:
     options = options or TimeSeriesOptions()
-    (seasonal_path, monthly_path, ma_path) = _get_full_plot_path(trend_plot_dir, settings)
+    (seasonal_path, monthly_path, ma_path) = _get_full_plot_path(trend_plot_dir, global_settings["sitename"], global_settings["filepath"])
     cross_distance = {key: np.asarray(series, dtype=float).copy() for key, series in cross_distance_tidally_corrected.items()}
     dates = output["dates"]
 
     if options.write_csv:
-        _write_time_series_csv(transects, cross_distance, dates, settings)
+        _write_time_series_csv(transects, cross_distance, dates, global_settings)
 
     # Compute trends and plots. (Note: outliers have already been rejected in the analysis stage)
     trend_dict: Dict[str, float] = {}
@@ -76,33 +76,33 @@ def run_time_series_post_processing(
     print(f"\nProcessed {processed} transects (skipped {skipped} due to insufficient data)")
     return TimeSeriesResult(cross_distance=cross_distance, trend_dict=trend_dict, processed_transects=processed, skipped_transects=skipped)
 
-def _get_full_plot_path(trend_plot_dir, settings):
+def _get_full_plot_path(trend_plot_dir, sitename, filepath):
     if trend_plot_dir:
-        os.makedirs(os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"]), exist_ok=True)
-        os.makedirs(os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"]), exist_ok=True)
-        os.makedirs(os.path.join(trend_plot_dir, "ma_plots", settings["inputs"]["sitename"]), exist_ok=True)
+        os.makedirs(os.path.join(trend_plot_dir, "seasonal_plots", sitename), exist_ok=True)
+        os.makedirs(os.path.join(trend_plot_dir, "monthly_plots", sitename), exist_ok=True)
+        os.makedirs(os.path.join(trend_plot_dir, "ma_plots", sitename), exist_ok=True)
         return (
-            os.path.join(trend_plot_dir, "seasonal_plots", settings["inputs"]["sitename"]),
-            os.path.join(trend_plot_dir, "monthly_plots", settings["inputs"]["sitename"]),
-            os.path.join(trend_plot_dir, "ma_plots", settings["inputs"]["sitename"])
+            os.path.join(trend_plot_dir, "seasonal_plots", sitename),
+            os.path.join(trend_plot_dir, "monthly_plots", sitename),
+            os.path.join(trend_plot_dir, "ma_plots", sitename)
         )
     else:
-        os.makedirs(os.path.join(settings["inputs"]["filepath"], "seasonal_plots"), exist_ok=True)
-        os.makedirs(os.path.join(settings["inputs"]["filepath"], "monthly_plots"), exist_ok=True)
-        os.makedirs(os.path.join(settings["inputs"]["filepath"], "ma_plots"), exist_ok=True)
+        os.makedirs(os.path.join(filepath, "seasonal_plots"), exist_ok=True)
+        os.makedirs(os.path.join(filepath, "monthly_plots"), exist_ok=True)
+        os.makedirs(os.path.join(filepath, "ma_plots"), exist_ok=True)
         return (
-            os.path.join(settings["inputs"]["filepath"], "seasonal_plots"),
-            os.path.join(settings["inputs"]["filepath"], "monthly_plots"),
-            os.path.join(settings["inputs"]["filepath"], "ma_plots")
+            os.path.join(filepath, "seasonal_plots"),
+            os.path.join(filepath, "monthly_plots"),
+            os.path.join(filepath, "ma_plots")
         )
 
-def _write_time_series_csv(transects, cross_distance, dates, settings):
+def _write_time_series_csv(transects, cross_distance, dates, global_settings):
     # Emit per-transect CSV time series for downstream use.
     out_dict = {"dates": dates}
     for key in transects.keys():
         out_dict[f"Transect {key}"] = cross_distance[key]
     df = pd.DataFrame(out_dict)
-    fn = os.path.join(settings["inputs"]["filepath"], "transect_time_series.csv")
+    fn = os.path.join(global_settings["filepath"], "transect_time_series.csv")
     df.to_csv(fn, sep=",")
 
 def _plot_ma(key, dates, chainage, fit, trend, trend_plot_dir):

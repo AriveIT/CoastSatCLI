@@ -12,7 +12,7 @@ class AnalysisStage(PipelineStage):
     description = "Generate shoreline plots/exports and prepare cross-distance arrays."
 
     def run(self, context: PipelineContext, params: Parameters) -> None:
-        settings = context.analysis_settings
+        settings = context.global_settings
         output = context.shoreline_output
 
         if settings is None or output is None:

@@ -16,12 +16,12 @@ class TideCorrectionStage(PipelineStage):
         output = context.shoreline_output
         cross_distance = context.cross_distance
         transects = context.transects
-        settings = context.analysis_settings
+        global_settings = context.global_settings
         slope_est = context.slope_est
         dates_sat = context.dates_sat
         tides_sat = context.tides_sat
 
-        required = (output, cross_distance, transects, settings)
+        required = (output, cross_distance, transects, global_settings)
         if any(value is None for value in required):
             raise RuntimeError("TideCorrectionStage missing required context data.")
 
@@ -35,7 +35,7 @@ class TideCorrectionStage(PipelineStage):
             output=output,
             cross_distance=cross_distance,
             transects=transects,
-            settings=settings,
+            global_settings=global_settings,
             slope_est=slope_est,
             dates_sat=dates_sat,
             tides_sat=tides_sat,

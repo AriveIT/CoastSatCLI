@@ -24,26 +24,6 @@ class TideConfig:
 
 
 @dataclass
-class InputsConfig:
-    """Input file references for a site."""
-    sitename: str
-    aoi_path: Path
-    reference_shoreline: Path
-    transects: Path
-    shoreline_path: Optional[Path] = None
-
-
-@dataclass
-class Settings:
-    """Typed settings view loaded from settings.json."""
-    raw: Dict[str, Any]
-    inputs: InputsConfig
-    output_dir: Path
-    output_epsg: int
-    tide: TideConfig
-
-
-@dataclass
 class PipelineContext:
     """
     Shared state passed between pipeline stages.
@@ -56,10 +36,9 @@ class PipelineContext:
 
     config_path: Path
     cli_options: Dict[str, Any] = field(default_factory=dict)
-    settings: Optional[Settings] = None
+    global_settings: Dict[str, Any] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
     inputs_config: Optional[Dict[str, Any]] = None
-    analysis_settings: Optional[Dict[str, Any]] = None
     geometry_info: Optional[Dict[str, Any]] = None
     imagery_metadata: Optional[Any] = None
     shoreline_output: Optional[Any] = None
@@ -76,7 +55,7 @@ class PipelineContext:
     trend_dict: Optional[Any] = None
     trend_results: Optional[Any] = None
 
-    def require_settings(self) -> Settings:
-        if self.settings is None:
-            raise RuntimeError("PipelineContext settings accessed before initialization.")
-        return self.settings
+    def require_settings(self) -> Dict[str, Any]:
+        if self.global_settings is None:
+            raise RuntimeError("PipelineContext global_settings accessed before initialization.")
+        return self.global_settings

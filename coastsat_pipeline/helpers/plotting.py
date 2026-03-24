@@ -26,7 +26,7 @@ def render_transect_trend_plot(
     options: PlottingOptions | None = None,
 ) -> None:
     options = options or PlottingOptions()
-    sitename = settings["inputs"]["sitename"]
+    sitename = settings["sitename"]
     trend_min, trend_max = options.trend_min, options.trend_max
     num_intervals = 100
 
@@ -63,7 +63,7 @@ def render_transect_trend_plot(
     cbar.set_ticks(range(int(trend_min), int(trend_max) + 1, 5))
     cbar.ax.tick_params(labelsize=10)
 
-    output_path = os.path.join(settings["inputs"]["filepath"], "transects_colored_by_trend_updated.jpg")
+    output_path = os.path.join(settings["filepath"], "transects_colored_by_trend_updated.jpg")
     fig.savefig(output_path, dpi=options.dpi)
     plt.close(fig)
 
