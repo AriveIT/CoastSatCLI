@@ -103,6 +103,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
         last_pct = -1
         cloud_skipped = 0
+        no_data_skipped = 0
         error_skipped = 0
         skip_skipped = 0
         cached = 0
@@ -129,7 +130,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
             cloud_cover_combined = np.divide(sum(sum(cloud_mask.astype(int))),
                                              (cloud_mask.shape[0]*cloud_mask.shape[1]))
             if cloud_cover_combined > 0.99:
-                cloud_skipped += 1
+                no_data_skipped += 1
                 continue
             cloud_mask_adv = np.logical_xor(cloud_mask, im_nodata)
             cloud_cover = np.divide(sum(sum(cloud_mask_adv.astype(int))),
@@ -222,7 +223,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
         print()
         print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
-                f"{error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
+                f"{no_data_skipped} skipped due to no data, {error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
         print(f"Shoreline buffer computed {computed} times and cached {cached} times")
 
     plot_cloud_cover_hist(cloud_covers, settings)
