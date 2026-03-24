@@ -268,7 +268,7 @@ def compute_intersection_QC(output, transects, settings):
                 )
 
                 # plot intersections and other clustering alg related info
-                if key in settings.get('transects_to_plot', []):
+                if key in settings.get('transects_to_plot', []) and c_info > 0:
                     plot_clustering_intersections(intersections, key, sl, transects[key], transect_class,
                             centroids, c_idx, c_info, cloud_min_max, cloud_points, str(output['dates'][sl_idx])[:10], settings)
 
@@ -305,7 +305,7 @@ def compute_intersection_QC(output, transects, settings):
     if settings.get("plot_n_clusters", False) and settings.get('cluster_intersection_selection', False):
         for transect_idx, key in enumerate(transects.keys()):
             transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx]
-            plot_n_clusters(cross_dist[key], output['dates'], n_cluster[:,0], transect_classes, key, settings['output_dir'])
+            plot_n_clusters(cross_dist[key], output['dates'], n_cluster[:,transect_idx], transect_classes, key, settings['output_dir'])
 
     # plot why intersections were rejected for each transect and shoreline
     if settings.get("plot_rejection_counts", False) and settings.get('cluster_intersection_selection', False):
@@ -675,10 +675,10 @@ def get_plot_range(collider, buffer=10):
 
 
 def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key, dir):
-    # note: unlabelled transects are thrown out - therefore not plotted
+    # note: intersections with unlabelled transects are thrown out - therefore not plotted
 
     # preprocessing
-    idx_not_nan = np.where(~np.isnan(n_clusters))[0]
+    idx_not_nan = np.where(~np.isnan(chainage))[0]
     idx1 = np.where(n_clusters == 1)[0]
     idx2 = np.where(n_clusters == 2)[0]
     idx_land = np.where(transect_classes == 0)[0]
@@ -697,7 +697,7 @@ def plot_n_clusters(chainage, dates, n_clusters, transect_classes, transect_key,
     fig.suptitle(f'{transect_key} time-series: {pct_2_cluster:.3f}% 2 cluster')
     ax.grid(linestyle=':', color='0.5')
     ax.set_ylabel('distance [m]')
-    
+
     # plot the data points
     ax.plot([dates[i] for i in idx_not_nan], chainage[idx_not_nan], c=str(0.8), linestyle='-') # line
     ax.plot([dates[i] for i in idx_1_land], chainage[idx_1_land], 'C2o', ms=4, mfc='w', mec='C2', label="1 cluster + land")
