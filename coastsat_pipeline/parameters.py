@@ -110,7 +110,7 @@ class Parameters:
 
         # plotting
         "plot_mndwi": False, # plot histograms of MNDWI values for each image
-        "save_detection_plots": True, # plot detection (RGB, pixel classification, MNDWI, and shoreline)
+        "save_detection_plots": True, # plot RGB, pixel classification, MNDWI, and extracted shoreline
     }
 
     #####################
@@ -134,8 +134,9 @@ class Parameters:
         "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
         
         # clustering shoreline selection plotting
-        "transects_to_plot": ["transect_005", "transect_026"], # plot all intersections for transects with these names
-        "plot_n_clusters": False, # plot number of clusters and transect class on time series for each transect
+        "transects_to_plot": ["transect_195"], # plot all intersections for transects with these names
+        "plot_entire_shoreline": False, # add third plot to intersection images showing the entire shoreline to provide more context
+        "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
         "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)
     }
 
