@@ -96,7 +96,7 @@ class Parameters:
 
         # extraction settings
         "cloud_thresh": 0.5, # percentage of image that can be covered by cloud
-        "dist_clouds": 50, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
+        "dist_clouds": 30, # distance in metres defining a buffer around cloudy pixels where the shoreline cannot be mapped
         "min_length_sl": 500, # minimum length of shoreline perimeter to be kept (in meters)
         "max_dist_ref" : 250, # maximum distance from the reference shoreline in meters
 
@@ -118,7 +118,7 @@ class Parameters:
     #####################
     transect_settings = {
 
-        # collider settings
+        # collider settings (note how these interact with max_dist_ref)
         "along_dist": 35, # how far a point can be orthogonally to transect line
         "past_dist": 300, # distance a shoreline points can be past end of transect and be counted as an intersection
         "min_chainage": -150, # furthest landward of the transect origin that an intersection is accepted
@@ -134,8 +134,10 @@ class Parameters:
         "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
         
         # clustering shoreline selection plotting
-        "transects_to_plot": ["transect_195"], # plot all intersections for transects with these names
-        "plot_entire_shoreline": False, # add third plot to intersection images showing the entire shoreline to provide more context
+        "transects_to_plot": ["transect_195", "transect_190"], # plot all intersections for transects with these names
+        "plot_entire_shoreline": True, # add plot to intersection images showing the entire shoreline to provide more context
+        "plot_1d": True, # add plot to intersection images showing projected intersection points
+
         "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
         "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)
     }

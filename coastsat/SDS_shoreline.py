@@ -222,9 +222,9 @@ def extract_shorelines(metadata, settings, print_errors=False):
         }
 
         print()
-        print(f"{satname}: {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
+        print(f"    {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
                 f"{no_data_skipped} skipped due to no data, {error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
-        print(f"Shoreline buffer computed {computed} times and cached {cached} times")
+        print(f"    Shoreline buffer computed {computed} times and cached {cached} times")
 
     plot_cloud_cover_hist(cloud_covers, settings)
 
@@ -1182,10 +1182,11 @@ def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, co
     ax2.set_anchor('C')
     ax3.set_anchor('E')
     
-    # add colorbar for MNDWI
-    cb = plt.colorbar(mwi_plot)
-    cb.ax.tick_params(labelsize=10)
-    cb.set_label('MNDWI values')
+    if not plot_extra:
+        # add colorbar for MNDWI
+        cb = plt.colorbar(mwi_plot)
+        cb.ax.tick_params(labelsize=10)
+        cb.set_label('MNDWI values')
 
     if plot_extra:
         ax5.imshow(im_RGB)
