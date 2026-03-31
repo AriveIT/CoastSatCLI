@@ -1061,7 +1061,9 @@ def plot_outlier_counts(outlier_stats, n_sl, dir):
 
     mean_outliers = np.sum(outlier_stats[[1, 2],:]) / n_transects
     mean_points = np.sum(outlier_stats) / n_transects
-    outlier_percentage = np.sum(outlier_stats[[1, 2],:]) / np.sum(outlier_stats)
+
+    total_points = np.sum(outlier_stats)
+    outlier_percentage = np.sum(outlier_stats[[1, 2],:]) / total_points if total_points != 0 else 0
 
 
 
