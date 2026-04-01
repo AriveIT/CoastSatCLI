@@ -1177,4 +1177,4 @@ def calculate_trend(dates,chainage):
     dates_ord = (dates_ord - np.min(dates_ord))/DAYS_IN_YEAR   
     trend, intercept, rvalue, pvalue, std_err = stats.linregress(dates_ord, chainage)
     y = dates_ord*trend+intercept
-    return trend, y
+    return trend, y, 1 - rvalue ** 2, std_err

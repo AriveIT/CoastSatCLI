@@ -53,6 +53,8 @@ class PipelineContext:
     plot_artifacts: List[Path] = field(default_factory=list)
     cross_distance_processed: Optional[Any] = None
     trend_dict: Optional[Any] = None
+    unexplained_var_dict: Optional[Any] = None
+    trend_std_dict: Optional[Any] = None
     trend_results: Optional[Any] = None
 
     def require_settings(self) -> Dict[str, Any]:

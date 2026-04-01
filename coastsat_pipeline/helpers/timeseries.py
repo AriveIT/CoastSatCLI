@@ -20,6 +20,8 @@ class TimeSeriesResult:
     """Summary of processed transect time-series."""
     cross_distance: Dict[str, np.ndarray]
     trend_dict: Dict[str, float]
+    unexplained_var_dict: Dict[str, float]
+    trend_std_dict: Dict[str, float]
     processed_transects: int
     skipped_transects: int
 
@@ -42,6 +44,8 @@ def run_time_series_post_processing(
 
     # Compute trends and plots. (Note: outliers have already been rejected in the analysis stage)
     trend_dict: Dict[str, float] = {}
+    unexplained_var_dict: Dict[str, float] = {}
+    trend_std_dict: Dict[str, float] = {}
     processed, skipped = 0, 0
 
     for key in cross_distance.keys():
@@ -52,7 +56,7 @@ def run_time_series_post_processing(
         valid_chainage = series[idx_valid]
 
         if valid_chainage.size > min_chainage_size:
-            trend, fitted = SDS_transects.calculate_trend(valid_dates, valid_chainage)
+            trend, fitted, unexplained_var, trend_std = SDS_transects.calculate_trend(valid_dates, valid_chainage)
             processed += 1
 
             if options.save_seasonal_plots:
@@ -67,14 +71,25 @@ def run_time_series_post_processing(
 
         else:
             trend = np.nan
+            unexplained_var = np.nan
+            trend_std = np.nan
             fitted = []
             skipped += 1
         trend_dict[key] = trend
+        unexplained_var_dict[key] = unexplained_var
+        trend_std_dict[key] = trend_std
 
 
     logger.info("Stage 07: processed %d transects (skipped %d due to insufficient data)", processed, skipped)
     print(f"\nProcessed {processed} transects (skipped {skipped} due to insufficient data)")
-    return TimeSeriesResult(cross_distance=cross_distance, trend_dict=trend_dict, processed_transects=processed, skipped_transects=skipped)
+    return TimeSeriesResult(
+        cross_distance=cross_distance,
+        trend_dict=trend_dict,
+        unexplained_var_dict=unexplained_var_dict,
+        trend_std_dict=trend_std_dict,
+        processed_transects=processed,
+        skipped_transects=skipped
+    )
 
 def _get_full_plot_path(trend_plot_dir, sitename, filepath):
     if trend_plot_dir:
@@ -136,7 +151,7 @@ def _plot_seasonal_average(key, dates, chainage, trend_plot_dir):
     dict_seas, dates_seas, chainage_seas, list_seas = SDS_transects.seasonal_average(dates.tolist(), chainage.tolist())
     if len(dates_seas) == 0:
         raise Exception("Not enough data for seasonal trends plot")
-    overall_trend, overall_fit = SDS_transects.calculate_trend(dates_seas, chainage_seas)
+    overall_trend, overall_fit, _, _ = SDS_transects.calculate_trend(dates_seas, chainage_seas)
     season_colors = {"DJF": "C3", "MAM": "C1", "JJA": "C2", "SON": "C0"}
 
     # 6-month moving average for smoother seasonal visualization (independent of trend).
@@ -150,7 +165,7 @@ def _plot_seasonal_average(key, dates, chainage, trend_plot_dir):
         s_dates = data["dates"]
         s_chain = data["chainages"]
         if len(s_dates) > 1:
-            seas_trend, seas_fit = SDS_transects.calculate_trend(s_dates, s_chain)
+            seas_trend, seas_fit, _, _ = SDS_transects.calculate_trend(s_dates, s_chain)
             season_trends[seas] = seas_trend
             season_fits[seas] = seas_fit
         else:

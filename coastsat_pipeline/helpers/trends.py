@@ -24,6 +24,8 @@ class TransectTrend:
     """
     id: str
     trend: float
+    unexplained_var: float
+    trend_std: float
     slope: float
     geometry: MultiLineString
     images_used: int
@@ -50,6 +52,8 @@ def compute_and_save_trends(
     global_settings: Dict[str, Any],
     slope_est: Dict[str, float],
     trend_dict: Dict[str, float],
+    unexplained_var_dict: Dict[str, float],
+    trend_std_dict: Dict[str, float],
     trend_plot_dir: str,
 ) -> TrendExportResult:
     """
@@ -62,6 +66,8 @@ def compute_and_save_trends(
         output=output,
         global_settings=global_settings,
         trend_dict=trend_dict,
+        unexplained_var_dict=unexplained_var_dict,
+        trend_std_dict=trend_std_dict,
         slope_est=slope_est,
         trend_plot_dir=trend_plot_dir,
     )
@@ -77,6 +83,8 @@ def _build_transect_trends(
     output: Dict[str, Any],
     global_settings: Dict[str, Any],
     trend_dict: Dict[str, float],
+    unexplained_var_dict: Dict[str, float],
+    trend_std_dict: Dict[str, float],
     slope_est: Dict[str, float],
     trend_plot_dir: str | None,
 ) -> List[TransectTrend]:
@@ -105,6 +113,8 @@ def _build_transect_trends(
             id=key,
             geometry=MultiLineString([geometry]),
             trend=trend_dict.get(key, np.nan),
+            unexplained_var=unexplained_var_dict.get(key, np.nan),
+            trend_std=trend_std_dict.get(key, np.nan),
             slope=slope_est.get(key, None),
             images_used=n_used,
             total_images=total_images,
