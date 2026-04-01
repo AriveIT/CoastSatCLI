@@ -19,8 +19,10 @@ class TrendCalculationStage(PipelineStage):
         settings = context.analysis_settings
         slope_est = context.slope_est
         trend_dict = context.trend_dict
+        unexplained_var_dict = context.unexplained_var_dict
+        trend_std_dict = context.trend_std_dict
 
-        if None in (transects, processed, output, settings, trend_dict):
+        if None in (transects, processed, output, settings, trend_dict, unexplained_var_dict, trend_std_dict):
             raise RuntimeError("TrendCalculationStage missing required context data.")
 
         self.logger.info("Calculating shoreline trends for %d transects", len(transects))
@@ -31,6 +33,8 @@ class TrendCalculationStage(PipelineStage):
             settings=settings,
             slope_est=slope_est,
             trend_dict=trend_dict,
+            unexplained_var_dict=unexplained_var_dict,
+            trend_std_dict=trend_std_dict,
             trend_plot_dir=params.alternate_trend_plot_dir,
         )
 

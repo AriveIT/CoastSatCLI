@@ -53,7 +53,7 @@ def render_transect_trend_plot(
         if min_len < 2:
             trend = 0.0
         else:
-            trend, _ = SDS_transects.calculate_trend(aligned_dates[:min_len], series[:min_len])
+            trend, _, _, _= SDS_transects.calculate_trend(aligned_dates[:min_len], series[:min_len])
         color = cmap(norm(trend))
         ax.plot(transects[key][:, 0], transects[key][:, 1], "-", color=color, lw=2)
         ax.plot(transects[key][0, 0], transects[key][0, 1], "bo", ms=5)

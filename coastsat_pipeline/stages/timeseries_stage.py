@@ -30,6 +30,8 @@ class TimeSeriesPostProcessingStage(PipelineStage):
 
         context.cross_distance_processed = result.cross_distance
         context.trend_dict = result.trend_dict
+        context.unexplained_var_dict = result.unexplained_var_dict
+        context.trend_std_dict = result.trend_std_dict
         context.metadata["timeseries"] = {
             "processed_transects": result.processed_transects,
             "skipped_transects": result.skipped_transects,
