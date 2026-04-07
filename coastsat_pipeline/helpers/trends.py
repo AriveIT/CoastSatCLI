@@ -12,7 +12,6 @@ from pyproj import CRS
 from shapely.geometry import MultiLineString
 
 import datetime
-import json
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +33,8 @@ class TransectTrend:
     plot_path: str
     ma_plot_path: str
     run_date: datetime
-    analysis_date_range: List
-    missions: List
+    analysis_date_range: str
+    missions: str
 
 
 @dataclass
@@ -122,8 +121,8 @@ def _build_transect_trends(
             plot_path=seasonal_plot_path,
             ma_plot_path=ma_plot_path,
             run_date=str(datetime.datetime.now()),
-            analysis_date_range=global_settings["dates"],
-            missions=global_settings["sat_list"],
+            analysis_date_range=str(global_settings["inputs"]["dates"])[1:-1], # webmap tool doesn't like lists
+            missions=str(global_settings["inputs"]["sat_list"])[1:-1],
         )
         records.append(record)
 
@@ -156,9 +155,6 @@ def _export_trends_geojson(records: List[TransectTrend], global_settings: Dict[s
     filepath = _get_geojson_path(trend_plot_dir, global_settings)
     geojson_path = os.path.join(filepath, f"{global_settings['sitename']}_transects_with_trends.geojson")
 
-    geojson = json.loads(gdf_transects.to_json())
-
-    with open(geojson_path, "w") as f:
-        json.dump(geojson, f)
+    gdf_transects.to_file(geojson_path, driver="GeoJSON", encoding="utf-8")
 
     return geojson_path
