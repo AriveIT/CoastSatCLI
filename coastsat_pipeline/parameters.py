@@ -111,6 +111,7 @@ class Parameters:
         # plotting
         "plot_mndwi": False, # plot histograms of MNDWI values for each image
         "save_detection_plots": True, # plot RGB, pixel classification, MNDWI, and extracted shoreline
+        "plot_cloud_cover": True, # plot histogram of cloud cover percentages of each image
     }
 
     #####################

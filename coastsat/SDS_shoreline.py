@@ -226,7 +226,8 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 f"{no_data_skipped} skipped due to no data, {error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
         print(f"    Shoreline buffer computed {computed} times and cached {cached} times")
 
-    plot_cloud_cover_hist(cloud_covers, settings)
+    if settings.get("plot_cloud_cover", False):
+        plot_cloud_cover_hist(cloud_covers, settings)
 
     if plt.get_fignums():
         plt.close()
