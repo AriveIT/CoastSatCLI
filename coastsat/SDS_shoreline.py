@@ -189,7 +189,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
             # determine if transect origins are on land or water
             if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
             if settings.get("plot_mndwi", False): plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
-            on_water = get_transect_origin_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
+            on_water = get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
             # build cloud mask kd tree
             cloud_idx = np.column_stack(np.where(cloud_mask))
@@ -316,7 +316,7 @@ def plot_cloud_cover_hist(cloud_covers, settings):
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
 
-def get_transect_origin_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filename, image_epsg):
+def get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filename, image_epsg):
     origins = transects[:,0,:]
     endpoints = transects[:,-1,:]
     midpoints = (origins + endpoints) / 2
