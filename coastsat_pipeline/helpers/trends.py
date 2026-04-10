@@ -121,8 +121,8 @@ def _build_transect_trends(
             plot_path=seasonal_plot_path,
             ma_plot_path=ma_plot_path,
             run_date=str(datetime.datetime.now()),
-            analysis_date_range=str(global_settings["inputs"]["dates"])[1:-1], # webmap tool doesn't like lists
-            missions=str(global_settings["inputs"]["sat_list"])[1:-1],
+            analysis_date_range=str(global_settings["dates"])[1:-1], # webmap tool doesn't like lists
+            missions=str(global_settings["sat_list"])[1:-1],
         )
         records.append(record)
 
