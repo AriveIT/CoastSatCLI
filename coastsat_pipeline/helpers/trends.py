@@ -5,6 +5,7 @@ import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Dict, List
+import shutil
 
 import geopandas as gpd
 import numpy as np
@@ -72,9 +73,12 @@ def compute_and_save_trends(
     )
     geojson_path = _export_trends_geojson(records, global_settings, trend_plot_dir)
 
+    # if using alternate trend plot, copy reference shoreline over
+    if trend_plot_dir:
+        copy_ref_sl_file(global_settings["reference_geojson"], trend_plot_dir)
+
     logger.info("Saved %d transect trends to %s", len(records), geojson_path)
     return TrendExportResult(records=records, geojson_path=geojson_path, trend_dict=trend_dict)
-
 
 def _build_transect_trends(
     transects: Dict[str, Any],
@@ -158,3 +162,10 @@ def _export_trends_geojson(records: List[TransectTrend], global_settings: Dict[s
     gdf_transects.to_file(geojson_path, driver="GeoJSON", encoding="utf-8")
 
     return geojson_path
+
+# "C:\Users\avanever\Documents\CoastSatProject\Sites\ten-mile-point\inputs\ten-mile-point_ref.geojson"
+def copy_ref_sl_file(ref_sl_path, trend_plot_dir):
+    src_path = Path(ref_sl_path)
+    dest_path = Path(trend_plot_dir) / "ref_sl"
+    os.makedirs(dest_path, exist_ok=True)
+    shutil.copy2(src_path, dest_path)
