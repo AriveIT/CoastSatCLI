@@ -411,6 +411,9 @@ def cluster_intersection_selection(intersections, clustering_threshold, transect
         if label_idx == -1:
             return None, None, -1, -1
         transect_class = transect_classes[label_idx]
+    # label_idx = 0
+    # offset = 0
+    # transect_class = transect_classes[0]
 
     if cloud_min_max:
         
@@ -608,7 +611,7 @@ def plot_clustering_intersections(intersections, key, sl, transect, transect_cla
                 ax_idx += 1
 
     # finalize plot
-    fig.legend(bbox_to_anchor=(0.5,0.0), loc='lower center', ncol=3)
+    fig.legend(bbox_to_anchor=(0.5,0.15), loc='upper center', ncol=3)
     fig.tight_layout(rect=[0, 0.15, 1, 1]) # second value reserves some place for the legend to sit
     
     # save plot
