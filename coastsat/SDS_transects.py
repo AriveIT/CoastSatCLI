@@ -910,34 +910,13 @@ def reject_outliers(cross_distance, output, settings):
         # store in chain_dict
         chain_dict[key] = chainage
         
-        print('--> %s: Removed %d outliers'%(key, len(dates1) - len(dates3)))
-        # figure for QA
-        if settings['plot_fig']:
-            fig,ax=plt.subplots(2,1,figsize=[12,6], sharex=True)
-            fig.set_tight_layout(True)
-            ax[0].grid(linestyle=':', color='0.5')
-            ax[0].set(ylabel='distance [m]',
-                      title= 'Transect %s original time-series - %d points' % (key, len(chainage1)))
-            
-            # note: chainages used to be centered at 0 (by subtracting the mean), but this made comparison to other plots difficult
-            # plot the data points
-            ax[0].plot(dates1, chainage1, 'C0-')
-            ax[0].plot(dates1, chainage1, 'C2o', ms=4, mec='k', mew=0.7,label='otsu')
-            # plot the indices removed because of the threshold
-            ax[0].plot(dates2, chainage2, 'C3o', ms=4, mec='k', mew=0.7,label='spike')
-            ax[0].legend(ncol=2,loc='upper right')
-            # plot the final time-series
-            ax[0].plot(dates3, chainage3, 'C0o', ms=4, mfc='w', mec='C0')
-            ax[1].grid(linestyle=':', color='0.5') 
-            ax[1].plot(dates3, chainage3, 'C0-o', ms=4, mfc='w', mec='C0')
-            ax[1].set(ylabel='distance [m]',
-                      title= 'Post-processed time-series - %d points' % (len(chainage3)))
-            fig.savefig(f"{settings['plot_dir']}\\outlier_rejection\\{key}_outlier_rejection.png")
-            plt.close(fig)
-
         outlier_stats[0, i] = len(chainage3) # points in post-processed time-series
         outlier_stats[1, i] = len(chainage2) - len(chainage3) # spike
         outlier_stats[2, i] = len(chainage1) - len(chainage2) # otsu
+        
+        print('--> %s: Removed %d outliers'%(key, len(dates1) - len(dates3)))
+        if settings['plot_fig']:
+            plot_outlier_rejection(key, chainage1, chainage2, chainage3, dates1, dates2, dates3, settings['plot_dir'])
 
     if settings['plot_fig']:
         plot_outlier_counts(outlier_stats, len(output['dates']), settings['plot_dir'])
@@ -1056,6 +1035,39 @@ def identify_outliers(chainage, dates, cross_change, debug=False):
      
     # return the time-series where the outliers have been removed
     return chainage_temp, dates_temp
+
+def plot_outlier_rejection(key, chainage1, chainage2, chainage3, dates1, dates2, dates3, plot_dir):
+    # only plot before
+    # fig, ax = plt.subplots(1, 1, figsize=(12, 3), tight_layout=True)
+    # ax.grid(linestyle=':', color='0.5')
+    # ax.set(ylabel='distance [m]',
+    #             title= 'Transect %s - %d points' % (key, len(chainage1)))
+    # ax.plot(dates1, chainage1, 'C0-')
+    # ax.plot(dates1, chainage1, 'C0o', ms=4, mfc='w', mec='C0')
+    
+    fig,ax=plt.subplots(2,1,figsize=[12,6], sharex=True)
+    fig.set_tight_layout(True)
+    ax[0].grid(linestyle=':', color='0.5')
+    ax[0].set(ylabel='distance [m]',
+                title= 'Transect %s original time-series - %d points' % (key, len(chainage1)))
+    ax[1].grid(linestyle=':', color='0.5') 
+    ax[1].set(ylabel='distance [m]',
+                title= 'Post-processed time-series - %d points' % (len(chainage3)))
+    
+    # plot the data points
+    ax[0].plot(dates1, chainage1, 'C0-')
+    ax[0].plot(dates3, chainage3, 'C0o', ms=4, mfc='w', mec='C0')
+
+    # plot the rejected points
+    ax[0].plot(dates2, chainage2, 'C3o', ms=4, mec='k', mew=0.7,label='spike')
+    ax[0].plot(dates1, chainage1, 'C2o', ms=4, mec='k', mew=0.7,label='otsu')
+
+    # plot the final time-series
+    ax[1].plot(dates3, chainage3, 'C0-o', ms=4, mfc='w', mec='C0')
+
+    ax[0].legend(ncol=2,loc='upper right')
+    fig.savefig(f"{plot_dir}\\outlier_rejection\\{key}_outlier_rejection.png")
+    plt.close(fig)
 
 def plot_outlier_counts(outlier_stats, n_sl, dir):
     labels = ["good", "spike", "otsu"]
