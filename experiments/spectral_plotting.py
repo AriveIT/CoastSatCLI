@@ -200,14 +200,14 @@ def save_all_plots(
             thresh_funcs,
 
             settings,
-            root_output_dir):
+            base_dir):
     im_idxs = get_idx_for_site(sitename)
-    root_output_dir = os.path.join(root_output_dir, "plots")
+    base_dir = os.path.join(base_dir, "spectral_analysis", "plots")
 
     for im_idx in im_idxs:
         t, b_points, b_labs, sl_points, t_labs = get_image_plotting_params(sitename, im_idx)
         title=fn_to_title(filenames[im_idx][0], sitename)
-        output_dir = os.path.join(root_output_dir, f"{sitename}_plots", title)
+        output_dir = os.path.join(base_dir, f"{sitename}_plots", title)
         os.makedirs(output_dir, exist_ok=True)
         samples = sample_ms(ims[im_idx], t)
 
