@@ -14,6 +14,8 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Iterable, List
+from datetime import datetime
+import csv
 
 import geopandas as gpd
 from gooey import Gooey, GooeyParser
@@ -34,13 +36,16 @@ from cli.dialogs import run_analysis_from_config  # noqa: E402
 IMAGE_DIR = ROOT_DIR / "assets" / "gooey_icons"
 
 
-def _split_paths(raw: str) -> List[str]:
+def _split_paths(raw) -> List[str]:
     """
     Gooey returns multi-file selections as a separator-delimited string.
     Support '|', ';', ',' and newlines to be tolerant across platforms.
     """
+    if isinstance(raw, (list, tuple)):
+        return [str(x).strip() for x in raw if str(x).strip()]
+
     parts: List[str] = []
-    for chunk in raw.replace("\n", "|").replace(";", "|").replace(",", "|").split("|"):
+    for chunk in str(raw).replace("\n", "|").replace(";", "|").replace(",", "|").split("|"):
         chunk = chunk.strip()
         if chunk:
             parts.append(chunk)
@@ -165,7 +170,25 @@ def _init_site(
     with open(settings_path, "w") as f:
         json.dump(settings, f, indent=4)
 
-    return {"settings_path": settings_path, "output_dir": output_dir, "epsg": epsg}
+    return {
+        "sitename": sitename,
+        "aoi_path": str(aoi_path),
+        "settings_path": settings_path,
+        "output_dir": output_dir,
+        "epsg": epsg,
+    }
+
+
+def delete_tifs(folder: Path):
+    """Delete all tif files inside a folder"""
+    count = 0
+    for tif in folder.rglob("*.tif"):
+        try:
+            tif.unlink()
+            count += 1
+        except Exception as e:
+            print(f"Could not delete {tif}: {e}")
+    print(f"Deleted {count} tif files in {folder}")
 
 
 @Gooey(
@@ -187,7 +210,18 @@ def main() -> None:
     parser.add_argument("--shoreline", required=True, widget="FileChooser", help="Shoreline GeoJSON/Shapefile covering the AOI(s).")
     parser.add_argument("--mode", choices=["single", "batch"], default="single", help="Initialize one AOI or multiple.")
     parser.add_argument("--aoi", widget="FileChooser", help="AOI KML (single mode).")
-    parser.add_argument("--aois", widget="MultiFileChooser", help="AOI KML files (batch mode).")
+    parser.add_argument(
+        "--aois",
+        nargs="+",
+        widget="MultiFileChooser",
+        help="AOI KML files (batch mode)."
+    )
+    # parser.add_argument("--aois", widget="MultiFileChooser", help="AOI KML files (batch mode).")
+    parser.add_argument(
+        "--delete_tifs",
+        action="store_true",
+        help="Delete intermediate tif files after each site run"
+    )
 
     # Tide inputs: choose FES or CSV, optional filter.
     tide_group = parser.add_argument_group("Tide correction")
@@ -214,6 +248,8 @@ def main() -> None:
     parser.add_argument("--run_now", action="store_true", help="Run analysis immediately after init.")
 
     args = parser.parse_args()
+
+    date = datetime.now().strftime("%Y%m%d")
 
     try:
         _validate_numeric(args)
@@ -254,7 +290,8 @@ def main() -> None:
         if not aoi_paths:
             print("No AOI files parsed from selection.")
             return
-        sitenames = [f"{args.sitename}_{str(i + 1).zfill(3)}" for i in range(len(aoi_paths))]
+        
+        sitenames = [f"{date}_{args.sitename}__{Path(i).stem}" for i in aoi_paths] # subfolders like '20260415_Vancouver__U_UTM10_0364'
 
     tide_config = _build_tide_config(args)
     tran_opts = {
@@ -264,18 +301,22 @@ def main() -> None:
         "skip_threshold": float(args.transect_skip_threshold),
     }
 
+
+    # modified to track failures instead of exit
     results = []
+    failures = []
     for aoi_path_str, sitename in zip(aoi_paths, sitenames):
         aoi_path = Path(aoi_path_str).expanduser().resolve()
         if not aoi_path.exists():
             print(f"AOI not found: {aoi_path}")
-            return
+            failures.append((sitename, str(aoi_path), "missing AOI"))
+            continue
         try:
             epsg = _detect_epsg(aoi_path, args.epsg)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"EPSG error for {aoi_path}: {exc}")
-            return
-
+            failures.append((sitename, str(aoi_path), f"EPSG error: {exc}"))
+            continue
         print(f"\nInitializing site '{sitename}' (EPSG {epsg})...")
         try:
             result = _init_site(
@@ -290,9 +331,10 @@ def main() -> None:
             results.append(result)
             print(f"  settings.json: {result['settings_path']}")
             print(f"  outputs dir  : {result['output_dir']}")
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             print(f"Failed to initialize {sitename}: {exc}")
-            exit(1)
+            failures.append((sitename, str(aoi_path), f"init failed: {exc}"))
+            continue
 
     print("\nInitialization complete.")
 
@@ -300,11 +342,50 @@ def main() -> None:
         print("\nStarting analysis...")
         for r in results:
             exit_code = run_analysis_from_config(Path(r["settings_path"]), engine=args.engine)
+            site_dir = Path(r["output_dir"])
             if exit_code == 0:
                 print(f"  {r['settings_path'].parent.name}: success")
             else:
                 print(f"  {r['settings_path'].parent.name}: failed (exit code {exit_code})")
                 exit(1)
+            if args.delete_tifs:
+                delete_tifs(site_dir) # delete tifs in site folder after run completes
+
+    # success/fail tracking report (TXT and CSV)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = base_dir/f"{args.sitename}_batch_report_{timestamp}.txt"
+    csv_path = base_dir/f"{args.sitename}_batch_report_{timestamp}.csv"
+    print("\nInitialization complete.")
+    print(f"Successful: {len(results)}")
+    print(f"Failed    : {len(failures)}")
+    report_lines = []
+    report_lines.append("CoastSat Batch Initialization Report\n")
+    report_lines.append(f"Base directory: {base_dir}\n")
+    report_lines.append(f"Total sites   : {len(results) + len(failures)}\n")
+    report_lines.append(f"Successful    : {len(results)}\n")
+    report_lines.append(f"Failed        : {len(failures)}\n")
+    report_lines.append("\n")
+    report_lines.append("Successful sites:\n")
+    for r in results:
+        line = f"{r['sitename']} | AOI: {r['aoi_path']} | settings: {r['settings_path']} | outputs: {r['output_dir']}"
+        print(f"Success: {line}")
+        report_lines.append(line+"\n")
+    report_lines.append("\nFailed sites:\n")
+    for sitename, aoi, reason in failures:
+        line = f"{sitename} | {aoi} | {reason}"
+        print(f"Failure: {line}")
+        report_lines.append(line+"\n")
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.writelines(report_lines)
+    print(f"\nBatch report written to:\n{report_path}")
+    with open(csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["sitename", "aoi", "status", "reason"])
+        for r in results:
+            writer.writerow([r["sitename"], r["aoi_path"], "success", ""])
+        for sitename, aoi, reason in failures:
+            writer.writerow([sitename, aoi, "failed", reason])
+    print(f"CSV report written to:\n{csv_path}")
 
 
 if __name__ == "__main__":
