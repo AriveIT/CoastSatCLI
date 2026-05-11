@@ -62,6 +62,8 @@ def print_options():
 
 @dataclass
 class Parameters:
+    project = "test-project-a157965" # name of google cloud project
+
     apply_tide_correction = True # False means skip slope estimation and tide correction
     
     # How much to put in log file

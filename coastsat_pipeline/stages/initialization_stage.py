@@ -16,6 +16,7 @@ class InitializationStage(PipelineStage):
         metadata = download_images(
             global_settings,
             params.download_filters,
+            params.project,
         )
 
         context.metadata["initialization"] = metadata

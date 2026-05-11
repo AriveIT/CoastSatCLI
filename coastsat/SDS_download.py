@@ -37,7 +37,7 @@ from coastsat import SDS_preprocess, SDS_tools, gdal_merge
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
-def authenticate_and_initialize():
+def authenticate_and_initialize(project):
     """
     Authenticates and initializes the Earth Engine API.
     This function handles the authentication and initialization process:
@@ -47,7 +47,7 @@ def authenticate_and_initialize():
     """
     # first try to initialize connection with GEE server with existing token
     try: 
-        ee.Initialize()
+        ee.Initialize(project=project)
         print('GEE initialized (existing token).')
     except:
         # if token is expired, try to refresh it
@@ -61,15 +61,15 @@ def authenticate_and_initialize():
             auth_req = google.auth.transport.requests.Request()
             creds.refresh(auth_req)
             # initialise GEE session with refreshed credentials
-            ee.Initialize(creds)
+            ee.Initialize(creds, project=project)
             print('GEE initialized (refreshed token).')
         except:
             # get the user to authenticate manually and initialize the sesion
             ee.Authenticate()
-            ee.Initialize()
+            ee.Initialize(project=project)
             print('GEE initialized (manual authentication).')
             
-def retrieve_images(inputs):
+def retrieve_images(inputs, project):
     """
     Downloads all images from Landsat 5, Landsat 7, Landsat 8, Landsat 9 and Sentinel-2
     covering the area of interest and acquired between the specified dates.
@@ -114,7 +114,7 @@ def retrieve_images(inputs):
     """
     # initialise connection with GEE server
     print("[Step 1] Initializing Google Earth Engine...")
-    authenticate_and_initialize()
+    authenticate_and_initialize(project)
 
     # check image availabiliy and retrieve list of images
     im_dict_T1, im_dict_T2 = check_images_available(inputs)
