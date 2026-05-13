@@ -53,7 +53,7 @@ def download(sitename, dl_dict, data_path, polygon):
                 'sitename': sitename,
                 'polygon': polygon
             }
-            modified_coastsat.retrieve_images(cur_inputs)
+            modified_coastsat.retrieve_images(cur_inputs, "test-project-a157965")
 
     inputs = {
         'filepath': data_path,

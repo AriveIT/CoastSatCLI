@@ -133,8 +133,13 @@ def plot_extractions(
             image_epsg,
             settings,
             output_dir=None,
-            n_col=int(3)):
-    im_RGB = SDS_preprocess.rescale_image_intensity(im[:,:,[2,1,0]], cloud_mask, 99.9)
+            n_col=3,
+            rescale=True):
+    if rescale:
+        im_RGB = SDS_preprocess.rescale_image_intensity(im[:,:,[2,1,0]], cloud_mask, 99.9)
+    else:
+        im_RGB = im[:,:,[2,1,0]]
+
     n_bands = im.shape[-1]
     im_flat = im.reshape(-1,n_bands)
     pal = sns.color_palette(palette='Dark2')

@@ -16,6 +16,7 @@ import ee
 import re
 import skimage.morphology as morphology
 import skimage.measure as measure
+import sklearn.decomposition as decomposition
 
 from osgeo import gdal
 from pyproj import CRS
@@ -25,7 +26,7 @@ from pylab import ginput
 sys.path.insert(0, os.pardir)
 from coastsat import SDS_download, SDS_preprocess, SDS_shoreline, SDS_tools, SDS_classify
 
-def retrieve_images(inputs):
+def retrieve_images(inputs, project):
     """
     Downloads all images from Landsat 5, Landsat 7, Landsat 8, Landsat 9 and Sentinel-2
     covering the area of interest and acquired between the specified dates.
@@ -69,7 +70,7 @@ def retrieve_images(inputs):
 
     """
     # initialise connection with GEE server
-    SDS_download.authenticate_and_initialize()
+    SDS_download.authenticate_and_initialize(project)
 
     # check image availabiliy and retrieve list of images
     im_dict_T1, im_dict_T2 = check_images_available(inputs)
@@ -924,3 +925,56 @@ def find_wl_contours1(im, cloud_mask, im_ref_buffer, threshold):
     contours = SDS_shoreline.process_contours(contours)
 
     return contours
+
+def pansharpen(im_ms, im_pan, cloud_mask):
+    """
+    Pansharpens a multispectral image, using the panchromatic band and a cloud mask.
+    A PCA is applied to the image, then the 1st PC is replaced, after histogram
+    matching with the panchromatic band. Note that it is essential to match the
+    histrograms of the 1st PC and the panchromatic band before replacing and
+    inverting the PCA.
+
+    KV WRL 2018
+
+    Arguments:
+    -----------
+    im_ms: np.array
+        Multispectral image to pansharpen (3D)
+    im_pan: np.array
+        Panchromatic band (2D)
+    cloud_mask: np.array
+        2D cloud mask with True where cloud pixels are
+
+    Returns:
+    -----------
+    im_ms_ps: np.ndarray
+        Pansharpened multispectral image (3D)
+
+    """
+    # check that cloud cover is not too high otherwise pansharpening fails
+    if sum(sum(cloud_mask)) > 0.95*cloud_mask.shape[0]*cloud_mask.shape[1]:
+        return im_ms
+    
+    # reshape image into vector and apply cloud mask
+    vec = im_ms.reshape(im_ms.shape[0] * im_ms.shape[1], im_ms.shape[2])
+    vec_mask = cloud_mask.reshape(im_ms.shape[0] * im_ms.shape[1])
+    vec = vec[~vec_mask, :]
+    # apply PCA to multispectral bands
+    pca = decomposition.PCA()
+    vec_pcs = pca.fit_transform(vec)
+    del vec
+
+    # replace 1st PC with pan band (after matching histograms)
+    vec_pan = im_pan.reshape(im_pan.shape[0] * im_pan.shape[1])
+    vec_pan = vec_pan[~vec_mask]
+    vec_pcs[:,0] = SDS_preprocess.hist_match(vec_pan, vec_pcs[:,0])
+    vec_ms_ps = pca.inverse_transform(vec_pcs)
+    del vec_pcs
+    del vec_pan
+
+    # reshape vector into image
+    vec_ms_ps_full = np.ones((len(vec_mask), im_ms.shape[2])) * np.nan
+    vec_ms_ps_full[~vec_mask,:] = vec_ms_ps
+    im_ms_ps = vec_ms_ps_full.reshape(im_ms.shape[0], im_ms.shape[1], im_ms.shape[2])
+
+    return im_ms_ps

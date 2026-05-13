@@ -54,7 +54,17 @@ def is_data_function(sitename, key):
     return sitename in key and "data" in key
 
 
-# need urban area too
+# need Canadian urban area too
+
+#############################
+# colombia
+#############################
+def colombia_download():
+    return {
+        "L8": [datetime(2020, 1, 9)],
+        "L9": [datetime(2021, 12, 28)],
+    }
+
 
 #############################
 # tofino-mudflat
