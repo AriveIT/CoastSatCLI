@@ -74,10 +74,21 @@ def apply_buffer_and_mask(im, cloud_mask, ref_buffer):
 
     # flatten images
     vec_buffer = im_ref_buffer_extra.flatten()
-    vec_idx = im.flatten()
     vec_mask = cloud_mask.flatten()
+
+    if len(im.shape) == 1:
+        vec_idx = im
+    elif len(im.shape) == 2:
+        vec_idx = im.flatten()
+    elif len(im.shape) == 3:
+        vec_idx = im.reshape(-1, im.shape[-1])
+
 
     # keep pixels that are in the buffer and not in the cloud mask
     vec = vec_idx[np.logical_and(vec_buffer,~vec_mask)]
 
-    return vec[~np.isnan(vec)]
+    nans = np.isnan(vec)
+    if len(nans.shape) == 2:
+        nans = np.logical_and.reduce(nans, axis=1)
+
+    return vec[~nans]

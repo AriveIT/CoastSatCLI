@@ -1,5 +1,5 @@
 """
-Modifications: Also download SWIR2, and removed prints
+based on kv coastsat
 """
 
 import os, sys
@@ -978,3 +978,47 @@ def pansharpen(im_ms, im_pan, cloud_mask):
     im_ms_ps = vec_ms_ps_full.reshape(im_ms.shape[0], im_ms.shape[1], im_ms.shape[2])
 
     return im_ms_ps
+
+# returns all intersections between given transect and shoreline
+def get_intersections(transect, sl, settings):
+
+    # compute rotation matrix
+    temp = np.array(transect[-1,:]) - np.array(transect[0,:])
+    phi = np.arctan2(temp[1], temp[0])
+    Mrot = np.array([[np.cos(phi), np.sin(phi)],[-np.sin(phi), np.cos(phi)]])
+
+    # calculate point to line distance between shoreline points and the transect
+    p0 = transect[0,:]
+    p1 = transect[-1,:]
+    d_line = np.abs(np.cross(p1-p0,sl-p0)/np.linalg.norm(p1-p0))
+
+    # calculate the distance between shoreline points and the origin of the transect
+    d_origin = np.linalg.norm(sl - p0, axis=1)
+
+    # find the shoreline points that are close to the transects and to the origin
+    # the distance to the origin is hard-coded here to 1 km 
+    search_limit = np.linalg.norm(p1 - p0) + settings['past_dist']
+    idx_dist = np.logical_and(d_line <= settings['along_dist'], d_origin <= search_limit) # note: this technically gives the collider a rounded end
+    idx_close = np.where(idx_dist)[0]
+    
+    # if no shoreline points close to the transect 
+    if len(idx_close) == 0:
+        return None
+
+    # change of base to shore-normal coordinate system
+    X0 = p0[0] # x and y of transect origin
+    Y0 = p0[1]
+    xy_close = np.array([sl[idx_close,0],sl[idx_close,1]]) - np.tile(np.array([[X0],
+                        [Y0]]), (1,len(sl[idx_close])))
+    
+    xy_rot = np.matmul(Mrot, xy_close)
+
+    # remove points that are too far landwards relative to the transect origin (i.e., negative chainage)
+    # xy_rot[0, xy_rot[0,:] < settings['min_chainage']] = np.nan
+    xy_rot = xy_rot[:, xy_rot[0,:] >= settings['min_chainage']]
+
+    # if all intersections are too far landwards
+    if np.all(np.isnan(xy_rot[0,:])):
+        return None
+    
+    return xy_rot

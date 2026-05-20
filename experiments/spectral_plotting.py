@@ -134,7 +134,8 @@ def plot_extractions(
             settings,
             output_dir=None,
             n_col=3,
-            rescale=True):
+            rescale=True,
+            gt_sl=None):
     if rescale:
         im_RGB = SDS_preprocess.rescale_image_intensity(im[:,:,[2,1,0]], cloud_mask, 99.9)
     else:
@@ -152,7 +153,16 @@ def plot_extractions(
     for i, idx_func in enumerate(index_funcs):
         index = idx_func(im_flat)
         ax = axs[i]
-
+            
+        ax.imshow(im_RGB, interpolation='none')
+        ax.grid(False)
+        ax.set_axis_off()
+        ax.set_title(f"{idx_func.__name__}")
+        # draw ground truth on bottom
+        if gt_sl:
+            for line_px in gt_sl:
+                ax.plot(line_px[:,0], line_px[:,1], c="white", zorder=0)
+        
         for j, t_func in enumerate(threshold_funcs):
             
             # prepare shoreline contours
@@ -164,12 +174,9 @@ def plot_extractions(
             contours = SDS_tools.convert_world2pix(contours, georef)
 
             # plot
-            ax.imshow(im_RGB, interpolation='none')
             ax.scatter(contours[:,0], contours[:,1], label=t_func.__name__, c=pal[j], s=1)
-            
-            ax.grid(False)
-            ax.set_axis_off()
-            ax.set_title(f"{idx_func.__name__}")
+
+
 
     # remove empty plots
     while i < n_row * n_col - 1:

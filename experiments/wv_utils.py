@@ -41,19 +41,23 @@ def load_sim_tif(fn):
     return bands
 
 
-def load_ref_sl(path, gt):
+def load_ref_sl(path):
     ref_sl_gdf = gpd.read_file(path)
 
     ref_sl_list = []
-    ref_sl_pxl_list = []
     for line in ref_sl_gdf.geometry:
         coords = np.array(line.coords)
-        pxl_coords = SDS_tools.convert_world2pix(coords, gt)
         
         ref_sl_list.append(coords)
-        ref_sl_pxl_list.append(pxl_coords)
 
-    return ref_sl_list, ref_sl_pxl_list
+    return ref_sl_list
+
+def ref_sl_to_pxl(ref_sl_list, georef):
+    ref_sl_pxl_list = []
+    for ref_sl in ref_sl_list:
+        ref_sl_pxl_list.append(SDS_tools.convert_world2pix(ref_sl, georef))
+
+    return ref_sl_pxl_list 
 
 ##########################
 # EDA
@@ -285,7 +289,7 @@ def naive_band_smushing(ms_deg_fn, swir_deg_fn, base_dir):
     return sim_fn
 
 ##########################
-# Shoreline Extraction
+# Shoreline
 ##########################
 def create_shoreline_buffer(im_shape, ref_sls, buffer_size): # from vos
 
@@ -314,6 +318,23 @@ def create_shoreline_buffer(im_shape, ref_sls, buffer_size): # from vos
 
     # Convert to bool to maintain compatibility with rest of workflow
     return im_buffer.astype(bool)
+
+
+def shoreline_to_points(ref_sl, delta=0.5):
+
+    all_points = []
+    for l in ref_sl:
+        line = LineString(l)
+
+        
+        distances = np.arange(0, line.length, delta)
+        points = [line.interpolate(distance).coords for distance in distances] + [line.boundary.geoms[1].coords]
+        points = np.array(points).reshape(-1, 2)
+        all_points.append(points)
+
+
+    return np.concat(all_points)
+
 
 ##########################
 # Misc

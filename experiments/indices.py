@@ -1,3 +1,6 @@
+from thresholding import apply_buffer_and_mask
+import numpy as np
+
 BLUE_IDX, GREEN_IDX, RED_IDX, NIR_IDX, SWIR1_IDX, SWIR2_IDX = 0, 1, 2, 3, 4, 5
 
 ################
@@ -53,9 +56,48 @@ def wi2019(sample):
     denom = green + swir1
     return numerator / denom
 
+def tct_wetness(sample):
+    blue, green, red, nir, swir1, swir2 = unpack_bands(sample)
+    return -(0.1511*blue + 0.1973*green + 0.3283*red + 0.3407*nir + 0.7117*swir1 + 0.4559*swir2)
+
+def ddwi(sample):
+    blue, green, red, nir, swir1, swir2 = unpack_bands(sample)
+    return nir - green
+
+################
+# Ensemble
+################
+def ensemble1(sim_bands, ensemble_index_functions, cloud_mask, sl_buffer):
+    ensemble_index = np.zeros(sim_bands.shape[:-1])
+    for ind_func in ensemble_index_functions:
+        im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
+        index_im = ind_func(im_flat).reshape(sim_bands.shape[:-1])
+
+        # standardize index values within buffer to [0, 1]
+        vec = apply_buffer_and_mask(index_im, cloud_mask, sl_buffer)
+        standardized_index_im = standardize(index_im, np.min(vec), np.max(vec))
+
+        ensemble_index += standardized_index_im
+
+    return ensemble_index / len(ensemble_index_functions)
+
+def ensemble2(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
+    ensemble_index = np.zeros(sim_bands.shape[:-1])
+    for ind_func in ensemble_index_functions:
+        
+        im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
+        index_im = ind_func(im_flat).reshape(sim_bands.shape[:-1])
+        threshold = thresh_fn(index_im, cloud_mask, sl_buffer)
+
+        ensemble_index += index_im < threshold
+    return ensemble_index / len(ensemble_index_functions)
+
 ################
 # Helpers
 ################
 def unpack_bands(sample):
     return sample[:,[BLUE_IDX, GREEN_IDX, RED_IDX, NIR_IDX, SWIR1_IDX, SWIR2_IDX]].T
+
+def standardize(data, minimum, maximum):
+    return (data - minimum) / (maximum - minimum)
 
