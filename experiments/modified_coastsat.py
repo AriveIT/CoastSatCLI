@@ -904,16 +904,11 @@ def get_filepath(inputs,satname):
     return filepath
 
 def find_wl_contours1(im, cloud_mask, im_ref_buffer, threshold):
-    nrows = cloud_mask.shape[0]
-    ncols = cloud_mask.shape[1]
-    # use im_ref_buffer and dilate it by 5 pixels
-    se = morphology.disk(5)
-    im_ref_buffer_extra = morphology.binary_dilation(im_ref_buffer,se)
-    vec_buffer = im_ref_buffer_extra.reshape(nrows*ncols)
-    # reshape spectral index image to vector
-    vec_ndwi = im.reshape(nrows*ncols)
+    vec_buffer = im_ref_buffer.flatten()
+    vec_ndwi = im.flatten()
+    vec_mask = cloud_mask.flatten()
+    
     # keep pixels that are in the buffer and not in the cloud mask
-    vec_mask = cloud_mask.reshape(nrows*ncols)
     vec = vec_ndwi[np.logical_and(vec_buffer,~vec_mask)]
     vec = vec[~np.isnan(vec)]
     

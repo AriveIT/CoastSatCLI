@@ -5,7 +5,7 @@ from matplotlib.patches import Patch
 
 import metrics as m
 
-def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_points_pxl, contours_pxl, im_rgb):
+def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_points_pxl, im_rgb, contours_pxl=None):
     outlier_idx = m.get_outlier_idx(metric, outlier_thresholds)
     metric_no_outliers = np.delete(metric, outlier_idx)
     transects_pix_no_outliers = np.delete(transects_pix, outlier_idx, axis=0)
@@ -24,7 +24,8 @@ def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_point
     ax.scatter(ref_sl_points_pxl[:,0], ref_sl_points_pxl[:,1], c="white", s=1)
 
     # sds sl
-    ax.scatter(contours_pxl[:,0], contours_pxl[:,1], c="black", s=1)
+    if contours_pxl is not None:
+        ax.scatter(contours_pxl[:,0], contours_pxl[:,1], c="black", s=1)
 
     # handle transects with no intersections and outliers
     idx_none = np.where(np.isnan(metric))[0]
@@ -40,7 +41,7 @@ def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_point
     return fig
     
 
-def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, contours_pxl, im_rgb):
+def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, im_rgb, contours_pxl=None):
     outlier_idx = m.get_outlier_idx(metric, outlier_thresholds)
     dists_no_outliers = np.delete(metric, outlier_idx)
     ref_sl_no_outliers = np.delete(ref_sl_points_pxl, outlier_idx, axis=0)
@@ -57,7 +58,8 @@ def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, contour
     ax.scatter(ref_sl_points_pxl[outlier_idx,0], ref_sl_points_pxl[outlier_idx,1], c="red", s=1) # outliers
 
     # sds sl
-    ax.scatter(contours_pxl[:,0], contours_pxl[:,1], c="white", s=1)
+    if contours_pxl is not None:
+        ax.scatter(contours_pxl[:,0], contours_pxl[:,1], c="white", s=1)
 
     ax.imshow(im_rgb, interpolation=None)
 
@@ -146,9 +148,10 @@ def plot_best_method_per_transect(idx, methods, transects_pix, ref_sl_points_pxl
     
     return fig
 
-def violin_plots(metric, methods, outlier_t=None, box_instead=False):
+def violin_plots(metric, methods, outlier_t=None, box_instead=False, sort_methods=False):
     no_outlier_performances = []
     valid_methods = []
+    means = []
     for i in range(len(methods)):
         no_outlier = metric[i, ~np.isnan(metric[i])]
         
@@ -158,6 +161,12 @@ def violin_plots(metric, methods, outlier_t=None, box_instead=False):
             continue
         no_outlier_performances.append(no_outlier)
         valid_methods.append(methods[i])
+        means.append(np.median(no_outlier))
+
+    if sort_methods:
+        sorted_idx = np.argsort(means)
+        no_outlier_performances = [no_outlier_performances[idx] for idx in sorted_idx]
+        valid_methods = [valid_methods[idx] for idx in sorted_idx]
 
     fig, ax = plt.subplots(figsize=(16, 8))
     if box_instead:

@@ -68,12 +68,8 @@ def local_min_otsu(im, cloud_mask, ref_buffer):
 ##########################
 def apply_buffer_and_mask(im, cloud_mask, ref_buffer):
 
-    # dilate ref_buffer by 5 pixels
-    se = morphology.disk(5)
-    im_ref_buffer_extra = morphology.binary_dilation(ref_buffer,se)
-
     # flatten images
-    vec_buffer = im_ref_buffer_extra.flatten()
+    vec_buffer = ref_buffer.flatten()
     vec_mask = cloud_mask.flatten()
 
     if len(im.shape) == 1:

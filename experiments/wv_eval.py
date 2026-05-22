@@ -1,11 +1,12 @@
 import modified_coastsat
-from coastsat import SDS_shoreline
+from coastsat import SDS_shoreline, SDS_tools
 import wv_utils as wv
 import wv_eval_plotting as wvep
 import modified_coastsat
 import metrics as m
 from indices import *
 from thresholding import *
+import local_sl_extraction as lse
 
 from scipy.ndimage import median_filter
 import numpy as np
@@ -24,12 +25,31 @@ def get_contours(index, threshold, sds_data):
     return SDS_shoreline.process_shoreline(contours, sds_data["cloud_mask"], sds_data["im_nodata"],
                                     sds_data["georef"], sds_data["image_epsg"], sds_data["sds_settings"])
     
-def evaluate_methods(index_functions, threshold_functions, sim_bands, ref_sl_points, transects, collider_settings, sds_data, ensemble_index_functions=[], binarize=False, smooth=False):
+def evaluate_methods(
+        index_functions,
+        threshold_functions,
+        sim_bands,
+        ref_sl_points,
+        transects,
+        collider_settings,
+        sds_data,
+        ensemble_index_functions=[],
+        binarize=False,
+        smooth=False,
+        local_extraction=False,
+        le_buffer=30,
+        le_spacing=50):
+    
     if ensemble1 in index_functions or ensemble2 in index_functions:
         assert ensemble_index_functions
+    if binarize and local_extraction:
+        print("binarizing and local thresholding/extraction doesn't really make sense")
+        assert 1 == 0
 
     if smooth:
         sim_bands = smooth_bands(sim_bands)
+    if local_extraction:
+        coords_pxl = SDS_tools.convert_world2pix(ref_sl_points[::int(le_spacing // 0.5)], sds_data["georef"])
 
     shoreline_metric = []
     transect_metric = []
@@ -52,7 +72,11 @@ def evaluate_methods(index_functions, threshold_functions, sim_bands, ref_sl_poi
                 index = index > threshold
                 threshold = 0.5
 
-            contours = get_contours(index.reshape(sim_bands.shape[:-1]), threshold, sds_data)
+            index = index.reshape(sim_bands.shape[:-1])
+            if local_extraction:
+                contours = lse.local_sl_extraction(coords_pxl, index, thresh_fn, le_buffer, sds_data)
+            else:
+                contours = get_contours(index.reshape(sim_bands.shape[:-1]), threshold, sds_data)
             
             # compute metrics
             shoreline_dist = m.get_nearest_distance(ref_sl_points, contours)
