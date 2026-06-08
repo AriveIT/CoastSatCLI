@@ -83,6 +83,7 @@ def apply_buffer_and_mask(im, cloud_mask, ref_buffer):
     # keep pixels that are in the buffer and not in the cloud mask
     vec = vec_idx[np.logical_and(vec_buffer,~vec_mask)]
 
+    # remove pixels with nan in any channel
     nans = np.isnan(vec)
     if len(nans.shape) == 2:
         nans = np.logical_and.reduce(nans, axis=1)

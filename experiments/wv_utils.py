@@ -274,7 +274,7 @@ def naive_degradation(target_res, resample_alg, base_dir):
     
     return degraded_fns
 
-def naive_band_smushing(ms_deg_fn, swir_deg_fn, base_dir):
+def naive_band_smushing(ms_deg_fn, swir_deg_fn, sim_fn):
     ms_degraded_bands = load_tif(ms_deg_fn)
     swir_degraded_bands = load_tif(swir_deg_fn, is_swir=True)
 
@@ -282,7 +282,6 @@ def naive_band_smushing(ms_deg_fn, swir_deg_fn, base_dir):
     sim_bands = np.append(sim_bands, swir_degraded_bands[:,:,[1,5]], axis=2)
 
     ds = gdal.Open(ms_deg_fn)
-    sim_fn = get_sim_tif_name("naive_res_10", base_dir)
     write_geotiff(sim_fn, sim_bands, ds)
 
     ds = None
@@ -291,14 +290,14 @@ def naive_band_smushing(ms_deg_fn, swir_deg_fn, base_dir):
 ##########################
 # Shoreline
 ##########################
-def create_shoreline_buffer(im_shape, ref_sls, buffer_size): # from vos
+def create_shoreline_buffer(im_shape, ref_sls, buffer_size, skip_degen=True): # from vos
 
     # Default to empty binary mask
     im_buffer = np.zeros(im_shape, dtype='uint8')
 
     shapes = []
     for ref_sl in ref_sls:
-        if len(ref_sl) < 2:
+        if skip_degen and len(ref_sl) < 2:
             continue  # skip degenerate lines
         try:
             line = LineString(ref_sl)
@@ -333,13 +332,14 @@ def shoreline_to_points(ref_sl, delta=0.5):
         all_points.append(points)
 
 
-    return np.concat(all_points)
+    return np.concatenate(all_points)
 
 
 ##########################
 # Misc
 ##########################
 def write_geotiff(filename, arr, in_ds):
+    print("here", filename)
     arr_type = gdal.GDT_Float32
 
     driver = gdal.GetDriverByName("GTiff")
