@@ -15,6 +15,7 @@ import pdb
 
 # earth engine module
 import ee
+from google import auth
 
 # modules to download, unzip and stack the images
 import requests
@@ -37,7 +38,7 @@ from coastsat import SDS_preprocess, SDS_tools, gdal_merge
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
 gdal.PushErrorHandler('CPLQuietErrorHandler')
 
-def authenticate_and_initialize(project):
+def authenticate_and_initialize():
     """
     Authenticates and initializes the Earth Engine API.
     This function handles the authentication and initialization process:
@@ -47,29 +48,31 @@ def authenticate_and_initialize(project):
     """
     # first try to initialize connection with GEE server with existing token
     try: 
+        _, project = auth.default()
         ee.Initialize(project=project)
         print('GEE initialized (existing token).')
-    except:
+    except Exception as e:
+        print(e)
         # if token is expired, try to refresh it
         # based on https://stackoverflow.com/questions/53472429/how-to-get-a-gcp-bearer-token-programmatically-with-python
         try:
-            import google.auth
-            import google.auth.transport.requests
-            creds, project = google.auth.default()
+            # import google.auth.transport.requests
+            creds, project = auth.default()
             # creds.valid is False, and creds.token is None
             # refresh credentials to populate those
-            auth_req = google.auth.transport.requests.Request()
+            auth_req = auth.transport.requests.Request()
             creds.refresh(auth_req)
             # initialise GEE session with refreshed credentials
             ee.Initialize(creds, project=project)
             print('GEE initialized (refreshed token).')
         except:
             # get the user to authenticate manually and initialize the sesion
+            _, project = auth.default()
             ee.Authenticate()
             ee.Initialize(project=project)
             print('GEE initialized (manual authentication).')
             
-def retrieve_images(inputs, project):
+def retrieve_images(inputs):
     """
     Downloads all images from Landsat 5, Landsat 7, Landsat 8, Landsat 9 and Sentinel-2
     covering the area of interest and acquired between the specified dates.
@@ -114,7 +117,7 @@ def retrieve_images(inputs, project):
     """
     # initialise connection with GEE server
     print("[Step 1] Initializing Google Earth Engine...")
-    authenticate_and_initialize(project)
+    authenticate_and_initialize()
 
     # check image availabiliy and retrieve list of images
     im_dict_T1, im_dict_T2 = check_images_available(inputs)
