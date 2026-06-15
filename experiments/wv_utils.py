@@ -238,7 +238,7 @@ def pansharpen(base_dir):
     im_ms_ps = np.append(im_ms[:,:,[0]], ps_bands, axis=2)
     im_ms_ps = np.append(im_ms_ps, im_ms[:,:,[6, 7]], axis=2)
 
-    ds = gdal.Open(coreg_ms_fn)
+    ds = gdal.Open(coreg_ms_fn) # sets geotransform as coreg ms (this is a mistake as resolution changes)
     ps_ms_fn = get_ps_tif_name(base_dir)
     write_geotiff(ps_ms_fn, im_ms_ps, ds)
 
