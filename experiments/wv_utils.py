@@ -31,7 +31,7 @@ def load_tif(fn, is_swir=False):
     im = None
     return bands / norm_factor
 
-
+# doesn't apply a normalization term
 def load_sim_tif(fn):
     im = gdal.Open(fn, gdal.GA_ReadOnly)
     n_bands = im.RasterCount
@@ -238,7 +238,7 @@ def pansharpen(base_dir):
     im_ms_ps = np.append(im_ms[:,:,[0]], ps_bands, axis=2)
     im_ms_ps = np.append(im_ms_ps, im_ms[:,:,[6, 7]], axis=2)
 
-    ds = gdal.Open(coreg_ms_fn) # sets geotransform as coreg ms (this is a mistake as resolution changes)
+    ds = gdal.Open(coreg_ms_fn)
     ps_ms_fn = get_ps_tif_name(base_dir)
     write_geotiff(ps_ms_fn, im_ms_ps, ds)
 
@@ -338,14 +338,16 @@ def shoreline_to_points(ref_sl, delta=0.5):
 ##########################
 # Misc
 ##########################
-def write_geotiff(filename, arr, in_ds):
-    print("here", filename)
+def write_geotiff(filename, arr, in_ds=None, proj=None, gt=None):
+    assert (in_ds is not None) != (proj is not None and gt is not None)
+    if in_ds: proj = in_ds.GetProjection()
+    if in_ds: gt = in_ds.GetGeoTransform()
     arr_type = gdal.GDT_Float32
 
     driver = gdal.GetDriverByName("GTiff")
     out_ds = driver.Create(filename, arr.shape[1], arr.shape[0], arr.shape[-1], arr_type)
-    out_ds.SetProjection(in_ds.GetProjection())
-    out_ds.SetGeoTransform(in_ds.GetGeoTransform())
+    out_ds.SetProjection(proj)
+    out_ds.SetGeoTransform(gt)
     
     for i in range(arr.shape[-1]):
         band = out_ds.GetRasterBand(i+1)

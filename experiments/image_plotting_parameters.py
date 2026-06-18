@@ -63,6 +63,7 @@ def colombia_download():
     return {
         "L8": [datetime(2020, 1, 9)],
         "L9": [datetime(2021, 12, 28)],
+        "S2": [datetime(2020, 1, 2)],
     }
 
 

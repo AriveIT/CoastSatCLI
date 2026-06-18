@@ -53,7 +53,7 @@ def download(sitename, dl_dict, data_path, polygon):
                 'sitename': sitename,
                 'polygon': polygon
             }
-            modified_coastsat.retrieve_images(cur_inputs, "test-project-a157965")
+            modified_coastsat.retrieve_images(cur_inputs)
 
     inputs = {
         'filepath': data_path,
@@ -81,6 +81,7 @@ def load_and_preprocess(metadata, inputs, buffer_settings):
 
             im_ms, georef, cloud_mask, im_extra, im_QA, im_nodata = modified_coastsat.preprocess_single(
                             fn, satname, cloud_mask_issue=False, pan_off=False, s2cloudless_prob=60)
+            print(f"{satname}-{i}: {im_ms.shape = }")
 
             im_buffer = SDS_shoreline.create_shoreline_buffer(cloud_mask.shape, georef, metadata[satname]['epsg'][i], buffer_settings)
 

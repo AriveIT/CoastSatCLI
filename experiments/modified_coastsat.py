@@ -26,7 +26,7 @@ from pylab import ginput
 sys.path.insert(0, os.pardir)
 from coastsat import SDS_download, SDS_preprocess, SDS_shoreline, SDS_tools, SDS_classify
 
-def retrieve_images(inputs, project):
+def retrieve_images(inputs):
     """
     Downloads all images from Landsat 5, Landsat 7, Landsat 8, Landsat 9 and Sentinel-2
     covering the area of interest and acquired between the specified dates.
@@ -70,7 +70,7 @@ def retrieve_images(inputs, project):
 
     """
     # initialise connection with GEE server
-    SDS_download.authenticate_and_initialize(project)
+    SDS_download.authenticate_and_initialize()
 
     # check image availabiliy and retrieve list of images
     im_dict_T1, im_dict_T2 = check_images_available(inputs)
