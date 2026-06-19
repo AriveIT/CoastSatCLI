@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from coastsat_pipeline.helpers.initialization import prepare_initial_settings
+from coastsat_pipeline.helpers.download import prepare_initial_settings
 
 
 @pytest.fixture(autouse=True)

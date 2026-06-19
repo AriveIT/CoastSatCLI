@@ -45,7 +45,7 @@ class TrendExportResult:
     trend_dict: Dict[str, float]
 
 
-def compute_and_save_trends(
+def save_trends(
     transects: Dict[str, Any],
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],

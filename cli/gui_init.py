@@ -447,7 +447,7 @@ def main() -> None:
     print("\nInitialization complete.")
     print(f"Successful: {len(init_results)}")
     print(f"Failed    : {len(init_failures)}")
-    write_initialization_report(init_results, init_failures, base_dir, args.sitename)
+    if args.mode != "single": write_initialization_report(init_results, init_failures, base_dir, args.sitename)
 
     if args.run_now:
         print("\nStarting analysis...")
@@ -456,7 +456,7 @@ def main() -> None:
         print("\nRuns Complete")
         print(f"Successful: {len(run_results)}")
         print(f"Failed    : {len(run_failures)}")
-        write_run_report(run_results, run_failures, base_dir, args.sitename)
+        if args.mode != "single": write_run_report(run_results, run_failures, base_dir, args.sitename)
         
         # tell gui a run failed
         if len(run_failures) > 0:

@@ -6,9 +6,8 @@ from .stage import PipelineStage
 from .stages import (
     AnalysisStage,
     ConfigLoadStage,
-    ImageryStage,
-    ImprovedTransectsPlotStage,
-    InitializationStage,
+    DetectionStage,
+    DownloadStage,
     SlopeEstimationStage,
     TideCorrectionStage,
     TimeSeriesPostProcessingStage,
@@ -26,12 +25,11 @@ def default_stages() -> List[PipelineStage]:
     """
     return [
         ConfigLoadStage(),
-        InitializationStage(),
-        ImageryStage(),
+        DownloadStage(),
+        DetectionStage(),
         AnalysisStage(),
         SlopeEstimationStage(),
         TideCorrectionStage(),
-        ImprovedTransectsPlotStage(),
         TimeSeriesPostProcessingStage(),
         TrendCalculationStage(),
     ]

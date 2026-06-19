@@ -8,7 +8,7 @@ from coastsat_pipeline.runner import PipelineRunner
 from coastsat_pipeline.stage import PipelineStage
 from coastsat_pipeline.stages.analysis_stage import AnalysisStage
 from coastsat_pipeline.stages.config_stage import ConfigLoadStage
-from coastsat_pipeline.stages.imagery_stage import ImageryStage
+from coastsat_pipeline.stages.detection_stage import ImageryStage
 from coastsat_pipeline.stages.plot_stage import ImprovedTransectsPlotStage
 from coastsat_pipeline.stages.slope_stage import SlopeEstimationStage
 from coastsat_pipeline.stages.tide_stage import TideCorrectionStage

@@ -32,25 +32,26 @@ def run_batch_shoreline_detection(
     settings = _build_extraction_settings(global_settings, shoreline_settings)
 
     scene_metrics_manifest, scene_metrics_path = _load_scene_metrics(settings)
-
-    preprocess_images(metadata, settings, options, scene_metrics_manifest, scene_metrics_path)
+    
+    if not options.skip_jpg:
+        save_jpg(metadata, settings, options, scene_metrics_manifest, scene_metrics_path)
     cached_output = load_cached_output(settings, cache_enabled=options.cache_enabled)
     if cached_output is not None:
         print("Using cached shorelines extraction output")
         return cached_output
 
     # Reload updated metrics and quality config after preprocessing/selection.
-    scene_metrics_manifest, _ = _load_scene_metrics(settings)
-    quality_cfg = load_quality_config(settings["inputs"]["filepath"])
-    preprocessed_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "preprocessed"
-    quality_skip_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "quality_skipped"
-    metadata = _apply_quality_filter(
-        metadata,
-        scene_metrics_manifest,
-        quality_cfg,
-        preprocessed_dir=preprocessed_dir,
-        skip_dir=quality_skip_dir,
-    )
+    # scene_metrics_manifest, _ = _load_scene_metrics(settings)
+    # quality_cfg = load_quality_config(settings["inputs"]["filepath"])
+    # preprocessed_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "preprocessed"
+    # quality_skip_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "quality_skipped"
+    # metadata = _apply_quality_filter(
+    #     metadata,
+    #     scene_metrics_manifest,
+    #     quality_cfg,
+    #     preprocessed_dir=preprocessed_dir,
+    #     skip_dir=quality_skip_dir,
+    # )
 
     output = run_detection(metadata, settings)
 
@@ -75,7 +76,7 @@ def _build_extraction_settings(global_settings: Dict[str, Any], shoreline_settin
 
     return settings
 
-def preprocess_images(
+def save_jpg(
     metadata: Dict[str, Any],
     settings: Dict[str, Any],
     imagery_opts: ImageryOptions,
@@ -105,14 +106,13 @@ def preprocess_images(
         print(f"[Imagery] Converting {total_missing} new scenes to JPG.")
         metadata_to_process = _filter_metadata_by_indices(metadata, missing_indices)
 
-    if not imagery_opts.skip_jpg:
-        SDS_preprocess.save_jpg(
-            metadata_to_process,
-            settings,
-            use_matplotlib=True,
-            debug_skipped_dir=debug_dir,
-            metrics_callback=metrics_buffer.append,
-        )
+    SDS_preprocess.save_jpg(
+        metadata_to_process,
+        settings,
+        use_matplotlib=True,
+        debug_skipped_dir=debug_dir,
+        metrics_callback=metrics_buffer.append,
+    )
     _update_jpg_manifest(manifest, metadata_to_process, manifest_path)
     _update_scene_metrics(scene_metrics, metrics_buffer, scene_metrics_file)
     if imagery_opts.prompt_for_ideal_selection:

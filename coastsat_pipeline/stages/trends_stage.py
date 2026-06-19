@@ -4,7 +4,7 @@ import logging
 
 from ..context import PipelineContext
 from ..stage import PipelineStage
-from ..helpers.trends import compute_and_save_trends
+from ..helpers.trends import save_trends
 from ..parameters import Parameters
 
 class TrendCalculationStage(PipelineStage):
@@ -26,7 +26,7 @@ class TrendCalculationStage(PipelineStage):
             raise RuntimeError("TrendCalculationStage missing required context data.")
 
         self.logger.info("Calculating shoreline trends for %d transects", len(transects))
-        trend_results = compute_and_save_trends(
+        trend_results = save_trends(
             transects=transects,
             cross_distance_tidally_corrected=processed,
             output=output,

@@ -1054,13 +1054,13 @@ def plot_outlier_rejection(key, chainage1, chainage2, chainage3, dates1, dates2,
     ax[1].set(ylabel='distance [m]',
                 title= 'Post-processed time-series - %d points' % (len(chainage3)))
     
-    # plot the data points
+    # plot the data line
     ax[0].plot(dates1, chainage1, 'C0-')
-    ax[0].plot(dates3, chainage3, 'C0o', ms=4, mfc='w', mec='C0')
 
-    # plot the rejected points
-    ax[0].plot(dates2, chainage2, 'C3o', ms=4, mec='k', mew=0.7,label='spike')
+    # plot points (and if they were rejected)
     ax[0].plot(dates1, chainage1, 'C2o', ms=4, mec='k', mew=0.7,label='otsu')
+    ax[0].plot(dates2, chainage2, 'C3o', ms=4, mec='k', mew=0.7,label='spike')
+    ax[0].plot(dates3, chainage3, 'C0o', ms=4, mfc='w', mec='C0')
 
     # plot the final time-series
     ax[1].plot(dates3, chainage3, 'C0-o', ms=4, mfc='w', mec='C0')
