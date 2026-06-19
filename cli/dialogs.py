@@ -227,7 +227,7 @@ def run_analysis_from_config(config_path: Path, engine: str = "legacy") -> int:
         except Exception as exc:
             typer.secho(f"Pipeline run failed: {exc}", fg=typer.colors.RED)
             traceback.print_exc()
-            return 1
+            return exc
 
     with open(config_path) as f:
         config = json.load(f)

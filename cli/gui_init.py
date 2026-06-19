@@ -190,6 +190,148 @@ def delete_tifs(folder: Path):
             print(f"Could not delete {tif}: {e}")
     print(f"Deleted {count} tif files in {folder}")
 
+def init_sites(aoi_paths, sitenames, epsg, shoreline_gdf, tide_config, base_dir, tran_opts):
+    # modified to track failures instead of exit
+    init_results = []
+    init_failures = []
+    for aoi_path_str, sitename in zip(aoi_paths, sitenames):
+        aoi_path = Path(aoi_path_str).expanduser().resolve()
+        if not aoi_path.exists():
+            print(f"AOI not found: {aoi_path}")
+            init_failures.append((sitename, str(aoi_path), "missing AOI"))
+            continue
+        try:
+            epsg = _detect_epsg(aoi_path, epsg)
+        except Exception as exc:
+            print(f"EPSG error for {aoi_path}: {exc}")
+            init_failures.append((sitename, str(aoi_path), f"EPSG error: {exc}"))
+            continue
+        print(f"\nInitializing site '{sitename}' (EPSG {epsg})...")
+        try:
+            result = _init_site(
+                aoi_path=aoi_path,
+                sitename=sitename,
+                shoreline_gdf=shoreline_gdf,
+                tide_config=tide_config,
+                base_dir=base_dir,
+                epsg=epsg,
+                transect_opts=tran_opts,
+            )
+            init_results.append(result)
+            print(f"  settings.json: {result['settings_path']}")
+            print(f"  outputs dir  : {result['output_dir']}")
+        except Exception as exc:
+            print(f"Failed to initialize {sitename}: {exc}")
+            init_failures.append((sitename, str(aoi_path), f"init failed: {exc}"))
+            continue
+    return init_results, init_failures
+
+def run_sites(init_results, args):
+    run_results = []
+    run_failures = []
+    for r in init_results:
+        exit_code = run_analysis_from_config(Path(r["settings_path"]), engine=args.engine)
+        site_dir = Path(r["output_dir"])
+        if exit_code == 0:
+            print(f"  {r['settings_path'].parent.name}: success")
+            run_results.append((r['sitename']))
+        else:
+            print(f"  {r['settings_path'].parent.name} failed: {exit_code}")
+            run_failures.append((r['sitename'], exit_code))
+        if args.delete_tifs:
+            delete_tifs(site_dir) # delete tifs in site folder after run completes
+    
+    return run_results, run_failures
+
+def write_to_txt(lines, path):
+    with open(path, "w", encoding="utf-8") as f:
+        f.writelines(lines)
+
+def write_to_init_csv(results, failures, path):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["sitename", "aoi", "status", "reason"])
+        for r in results:
+            writer.writerow([r["sitename"], r["aoi_path"], "success", ""])
+        for sitename, aoi, reason in failures:
+            writer.writerow([sitename, aoi, "failed", reason])  
+
+def write_to_run_csv(results, failures, path):
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["sitename", "status", "reason"])
+        for r in results:
+            writer.writerow([r, "success", ""])
+        for sitename, reason in failures:
+            writer.writerow([sitename, "failed", reason])  
+
+def write_run_report(results, failures, base_dir, sitename):
+    # header
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = base_dir/f"{sitename}_run_batch_report_{timestamp}.txt"
+    csv_path = base_dir/f"{sitename}_run_batch_report_{timestamp}.csv"
+    report_lines = []
+    report_lines.append("CoastSat Batch Run Report\n")
+    report_lines.append(f"Base directory: {base_dir}\n")
+    report_lines.append(f"Total sites   : {len(results) + len(failures)}\n")
+    report_lines.append(f"Successful    : {len(results)}\n")
+    report_lines.append(f"Failed        : {len(results)}\n")
+    report_lines.append("\n")
+
+    # successfully run sites
+    report_lines.append("Successful sites:\n")
+    for r in results:
+        print(f"Success: {r}")
+        report_lines.append(r+"\n")
+
+    # unsuccessfully run sites
+    report_lines.append("\nFailed sites:\n")
+    for sitename, reason in failures:
+        line = f"{sitename} | {reason}"
+        print(f"Failure: {line}")
+        report_lines.append(line+"\n")
+    
+    # write to files
+    write_to_txt(report_lines, report_path)
+    print(f"\nRun Batch report written to:\n{report_path}")
+    write_to_run_csv(results, failures, csv_path)
+    print(f"Run CSV report written to:\n{csv_path}")
+
+# initialization success/fail tracking report (TXT and CSV)
+# NOTE: sitename is the parent folder for all the batched sites
+def write_initialization_report(results, failures, base_dir, sitename):
+    
+    # header
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    report_path = base_dir/f"{sitename}_init_batch_report_{timestamp}.txt"
+    csv_path = base_dir/f"{sitename}_init_batch_report_{timestamp}.csv"
+    report_lines = []
+    report_lines.append("CoastSat Batch Initialization Report\n")
+    report_lines.append(f"Base directory: {base_dir}\n")
+    report_lines.append(f"Total sites   : {len(results) + len(failures)}\n")
+    report_lines.append(f"Successful    : {len(results)}\n")
+    report_lines.append(f"Failed        : {len(results)}\n")
+    report_lines.append("\n")
+
+    # successfully initialized sites
+    report_lines.append("Successful sites:\n")
+    for r in results:
+        line = f"{r['sitename']} | AOI: {r['aoi_path']} | settings: {r['settings_path']} | outputs: {r['output_dir']}"
+        print(f"Success: {line}")
+        report_lines.append(line+"\n")
+
+    # unsuccessfully initialized sites
+    report_lines.append("\nFailed sites:\n")
+    for sitename, aoi, reason in failures:
+        line = f"{sitename} | {aoi} | {reason}"
+        print(f"Failure: {line}")
+        report_lines.append(line+"\n")
+    
+    # write to files
+    write_to_txt(report_lines, report_path)
+    print(f"\nInit Batch report written to:\n{report_path}")
+    write_to_init_csv(results, failures, csv_path)
+    print(f"Init CSV report written to:\n{csv_path}")
 
 @Gooey(
     program_name="CoastSat Init GUI",
@@ -301,91 +443,24 @@ def main() -> None:
         "skip_threshold": float(args.transect_skip_threshold),
     }
 
-
-    # modified to track failures instead of exit
-    results = []
-    failures = []
-    for aoi_path_str, sitename in zip(aoi_paths, sitenames):
-        aoi_path = Path(aoi_path_str).expanduser().resolve()
-        if not aoi_path.exists():
-            print(f"AOI not found: {aoi_path}")
-            failures.append((sitename, str(aoi_path), "missing AOI"))
-            continue
-        try:
-            epsg = _detect_epsg(aoi_path, args.epsg)
-        except Exception as exc:
-            print(f"EPSG error for {aoi_path}: {exc}")
-            failures.append((sitename, str(aoi_path), f"EPSG error: {exc}"))
-            continue
-        print(f"\nInitializing site '{sitename}' (EPSG {epsg})...")
-        try:
-            result = _init_site(
-                aoi_path=aoi_path,
-                sitename=sitename,
-                shoreline_gdf=shoreline_gdf,
-                tide_config=tide_config,
-                base_dir=base_dir,
-                epsg=epsg,
-                transect_opts=tran_opts,
-            )
-            results.append(result)
-            print(f"  settings.json: {result['settings_path']}")
-            print(f"  outputs dir  : {result['output_dir']}")
-        except Exception as exc:
-            print(f"Failed to initialize {sitename}: {exc}")
-            failures.append((sitename, str(aoi_path), f"init failed: {exc}"))
-            continue
-
+    init_results, init_failures = init_sites(aoi_paths, sitenames, args.epsg, shoreline_gdf, tide_config, base_dir, tran_opts)
     print("\nInitialization complete.")
+    print(f"Successful: {len(init_results)}")
+    print(f"Failed    : {len(init_failures)}")
+    write_initialization_report(init_results, init_failures, base_dir, args.sitename)
 
     if args.run_now:
         print("\nStarting analysis...")
-        for r in results:
-            exit_code = run_analysis_from_config(Path(r["settings_path"]), engine=args.engine)
-            site_dir = Path(r["output_dir"])
-            if exit_code == 0:
-                print(f"  {r['settings_path'].parent.name}: success")
-            else:
-                print(f"  {r['settings_path'].parent.name}: failed (exit code {exit_code})")
-                exit(1)
-            if args.delete_tifs:
-                delete_tifs(site_dir) # delete tifs in site folder after run completes
-
-    # success/fail tracking report (TXT and CSV)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    report_path = base_dir/f"{args.sitename}_batch_report_{timestamp}.txt"
-    csv_path = base_dir/f"{args.sitename}_batch_report_{timestamp}.csv"
-    print("\nInitialization complete.")
-    print(f"Successful: {len(results)}")
-    print(f"Failed    : {len(failures)}")
-    report_lines = []
-    report_lines.append("CoastSat Batch Initialization Report\n")
-    report_lines.append(f"Base directory: {base_dir}\n")
-    report_lines.append(f"Total sites   : {len(results) + len(failures)}\n")
-    report_lines.append(f"Successful    : {len(results)}\n")
-    report_lines.append(f"Failed        : {len(failures)}\n")
-    report_lines.append("\n")
-    report_lines.append("Successful sites:\n")
-    for r in results:
-        line = f"{r['sitename']} | AOI: {r['aoi_path']} | settings: {r['settings_path']} | outputs: {r['output_dir']}"
-        print(f"Success: {line}")
-        report_lines.append(line+"\n")
-    report_lines.append("\nFailed sites:\n")
-    for sitename, aoi, reason in failures:
-        line = f"{sitename} | {aoi} | {reason}"
-        print(f"Failure: {line}")
-        report_lines.append(line+"\n")
-    with open(report_path, "w", encoding="utf-8") as f:
-        f.writelines(report_lines)
-    print(f"\nBatch report written to:\n{report_path}")
-    with open(csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["sitename", "aoi", "status", "reason"])
-        for r in results:
-            writer.writerow([r["sitename"], r["aoi_path"], "success", ""])
-        for sitename, aoi, reason in failures:
-            writer.writerow([sitename, aoi, "failed", reason])
-    print(f"CSV report written to:\n{csv_path}")
+        
+        run_results, run_failures = run_sites(init_results, args)
+        print("\nRuns Complete")
+        print(f"Successful: {len(run_results)}")
+        print(f"Failed    : {len(run_failures)}")
+        write_run_report(run_results, run_failures, base_dir, args.sitename)
+        
+        # tell gui a run failed
+        if len(run_failures) > 0:
+            exit(1)
 
 
 if __name__ == "__main__":
