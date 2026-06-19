@@ -10,8 +10,8 @@ from coastsat_pipeline.stages.analysis_stage import AnalysisStage
 from coastsat_pipeline.stages.config_stage import ConfigLoadStage
 from coastsat_pipeline.stages.detection_stage import ImageryStage
 from coastsat_pipeline.stages.plot_stage import ImprovedTransectsPlotStage
-from coastsat_pipeline.stages.slope_stage import SlopeEstimationStage
-from coastsat_pipeline.stages.tide_stage import TideCorrectionStage
+from coastsat_pipeline.stages.slope_estimation_stage import SlopeEstimationStage
+from coastsat_pipeline.stages.tide_correction_stage import TideCorrectionStage
 from coastsat_pipeline.stages.timeseries_stage import TimeSeriesPostProcessingStage
 from coastsat_pipeline.stages.trends_stage import TrendCalculationStage
 from coastsat_pipeline.helpers.trends import TrendExportResult

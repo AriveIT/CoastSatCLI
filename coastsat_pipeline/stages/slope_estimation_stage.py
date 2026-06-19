@@ -8,7 +8,7 @@ from ..stage import PipelineStage
 from ..parameters import Parameters
 
 class SlopeEstimationStage(PipelineStage):
-    name = "slope"
+    name = "slope estimation"
     description = "Estimate transect slopes to support tide correction and trends."
 
     def run(self, context: PipelineContext, params: Parameters) -> None:

@@ -13,7 +13,7 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = False # plots all extracted shorelines in different colours
-    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
     skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
@@ -76,8 +76,8 @@ class Parameters:
     #####################
     # Note: these parameters only affect downloads. Analysis is unaffected (it is performed on anything already downloaded)
     download_filters = {
-        'dates': ['2020-01-01', '2025-01-01'], #["1984-01-01", "2025-01-01"], # range of dates of aquisitions to be downloaded
-        'sat_list': ["L8", "L9"], # satellite missions to download images from
+        'dates': ["1984-01-01", "2025-01-01"], # range of dates of aquisitions to be downloaded
+        'sat_list': ["L5", "L7", "L8", "L9"], # satellite missions to download images from
         # 'excluded_epsg_codes': ['32609'], # exclude images with given epsg codes
         # 'LandsatWRS': '055022', # specify a Landsat tile (WRS path/row)
         # 'S2tile': '09UVA', # specifies an S2 tile
@@ -136,7 +136,7 @@ class Parameters:
         "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
         
         # clustering shoreline selection plotting
-        "transects_to_plot": ["transect_195", "transect_190"], # plot all intersections for transects with these names
+        "transects_to_plot": [], # plot all intersections for transects with these names
         "plot_entire_shoreline": True, # add plot to intersection images showing the entire shoreline to provide more context
         "plot_1d": True, # add plot to intersection images showing projected intersection points
 
