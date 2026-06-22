@@ -234,10 +234,10 @@ def run_sites(init_results, args):
         site_dir = Path(r["output_dir"])
         if exit_code == 0:
             print(f"  {r['settings_path'].parent.name}: success")
-            run_results.append((r['sitename']))
+            run_results.append((r['sitename'], datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
         else:
             print(f"  {r['settings_path'].parent.name} failed: {exit_code}")
-            run_failures.append((r['sitename'], exit_code))
+            run_failures.append((r['sitename'], exit_code, datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
         if args.delete_tifs:
             delete_tifs(site_dir) # delete tifs in site folder after run completes
     
@@ -259,15 +259,15 @@ def write_to_init_csv(results, failures, path):
 def write_to_run_csv(results, failures, path):
     with open(path, "w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["sitename", "status", "reason"])
-        for r in results:
-            writer.writerow([r, "success", ""])
-        for sitename, reason in failures:
-            writer.writerow([sitename, "failed", reason])  
+        writer.writerow(["sitename", "status", "reason", "end time"])
+        for sitename, endtime in results:
+            writer.writerow([sitename, "success", "", endtime])
+        for sitename, reason, endtime in failures:
+            writer.writerow([sitename, "failed", reason, endtime])  
 
 def write_run_report(results, failures, base_dir, sitename):
     # header
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     report_path = base_dir/f"{sitename}_run_batch_report_{timestamp}.txt"
     csv_path = base_dir/f"{sitename}_run_batch_report_{timestamp}.csv"
     report_lines = []
@@ -280,14 +280,15 @@ def write_run_report(results, failures, base_dir, sitename):
 
     # successfully run sites
     report_lines.append("Successful sites:\n")
-    for r in results:
-        print(f"Success: {r}")
-        report_lines.append(r+"\n")
+    for sitename, endtime in results:
+        line = f"{sitename} | {endtime}"
+        print(f"Success: {line}")
+        report_lines.append(line + "\n")
 
     # unsuccessfully run sites
     report_lines.append("\nFailed sites:\n")
-    for sitename, reason in failures:
-        line = f"{sitename} | {reason}"
+    for sitename, reason, endtime in failures:
+        line = f"{sitename} | {reason} | {endtime}"
         print(f"Failure: {line}")
         report_lines.append(line+"\n")
     
@@ -302,7 +303,7 @@ def write_run_report(results, failures, base_dir, sitename):
 def write_initialization_report(results, failures, base_dir, sitename):
     
     # header
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     report_path = base_dir/f"{sitename}_init_batch_report_{timestamp}.txt"
     csv_path = base_dir/f"{sitename}_init_batch_report_{timestamp}.csv"
     report_lines = []
@@ -350,20 +351,19 @@ def main() -> None:
     parser.add_argument("--base_dir", required=True, widget="DirChooser", help="Base directory where the project folder will be created.")
     parser.add_argument("--sitename", required=True, help="Project name (used as folder name).")
     parser.add_argument("--shoreline", required=True, widget="FileChooser", help="Shoreline GeoJSON/Shapefile covering the AOI(s).")
-    parser.add_argument("--mode", choices=["single", "batch"], default="single", help="Initialize one AOI or multiple.")
-    parser.add_argument("--aoi", widget="FileChooser", help="AOI KML (single mode).")
     parser.add_argument(
         "--aois",
         nargs="+",
         widget="MultiFileChooser",
-        help="AOI KML files (batch mode)."
+        required=True,
+        help="AOI KML file(s)"
     )
-    # parser.add_argument("--aois", widget="MultiFileChooser", help="AOI KML files (batch mode).")
     parser.add_argument(
         "--delete_tifs",
         action="store_true",
         help="Delete intermediate tif files after each site run"
     )
+    parser.add_argument("--run_now", action="store_true", help="Run analysis immediately after init.")
 
     # Tide inputs: choose FES or CSV, optional filter.
     tide_group = parser.add_argument_group("Tide correction")
@@ -372,11 +372,13 @@ def main() -> None:
     tide_group.add_argument("--tide_csv", widget="FileChooser", help="Tide CSV path (for CSV mode).")
     tide_group.add_argument("--beach_slope", default=0.1, help="Beach slope for CSV tide mode.", type=float)
 
+    # Tide filtering
     tide_filter_group = parser.add_argument_group("Tide filtering", gooey_options={"group": "Tide correction"})
     tide_filter_group.add_argument("--enable_tide_filter", action="store_true", help="Enable tide percentile filtering.")
     tide_filter_group.add_argument("--tide_lower_percentile", default=5.0, type=float, help="Lower percentile to keep (0-100).")
     tide_filter_group.add_argument("--tide_upper_percentile", default=95.0, type=float, help="Upper percentile to keep (0-100).")
 
+    # EPSG override
     epsg_group = parser.add_argument_group("EPSG")
     epsg_group.add_argument("--epsg", type=int, help="Manual EPSG override. Leave blank to auto-detect from AOI.")
 
@@ -387,10 +389,7 @@ def main() -> None:
     tran_group.add_argument("--transect_offset_ratio", default=0.75, type=float, help="Fraction seaward vs landward (0-1).")
     tran_group.add_argument("--transect_skip_threshold", default=300.0, type=float, help="Skip shoreline segments shorter than this (m).")
 
-    parser.add_argument("--run_now", action="store_true", help="Run analysis immediately after init.")
-
     args = parser.parse_args()
-
     date = datetime.now().strftime("%Y%m%d")
 
     try:
@@ -402,6 +401,7 @@ def main() -> None:
     base_dir = Path(args.base_dir).expanduser().resolve()
     base_dir.mkdir(parents=True, exist_ok=True)
 
+    # shoreline handling
     shoreline_path = Path(args.shoreline).expanduser().resolve()
     if not shoreline_path.exists():
         print(f"Shoreline file not found: {shoreline_path}")
@@ -413,27 +413,20 @@ def main() -> None:
         print(f"Failed to read shoreline: {exc}")
         return
 
+    # Tide correction method
     if args.tide_method == "fes" and not args.fes_config:
         raise ValueError("Tide method FES is selected. Please select a FES config file")
     if args.tide_method == "csv" and not args.tide_csv:
         raise ValueError("Tide method CSV is selected. Please select a CSV tide file")
 
-    if args.mode == "single":
-        if not args.aoi:
-            print("Please select an AOI file for single mode.")
-            return
-        aoi_paths: Iterable[str] = [args.aoi]
-        sitenames = [args.sitename]
-    else:
-        if not args.aois:
-            print("Please select AOI files for batch mode.")
-            return
-        aoi_paths = _split_paths(args.aois)
-        if not aoi_paths:
-            print("No AOI files parsed from selection.")
-            return
-        
-        sitenames = [f"{date}_{args.sitename}__{Path(i).stem}" for i in aoi_paths] # subfolders like '20260415_Vancouver__U_UTM10_0364'
+    # AOI input handling
+    if not args.aois:
+        print("Please select one or more AOI files")
+        return
+    aoi_paths = _split_paths(args.aois)
+
+    if len(aoi_paths) == 1: sitenames = [args.sitename]
+    else: sitenames = [f"{date}_{args.sitename}__{Path(i).stem}" for i in aoi_paths] # subfolders like '20260415_Vancouver__U_UTM10_0364'
 
     tide_config = _build_tide_config(args)
     tran_opts = {
@@ -447,7 +440,7 @@ def main() -> None:
     print("\nInitialization complete.")
     print(f"Successful: {len(init_results)}")
     print(f"Failed    : {len(init_failures)}")
-    if args.mode != "single": write_initialization_report(init_results, init_failures, base_dir, args.sitename)
+    if len(aoi_paths) > 1: write_initialization_report(init_results, init_failures, base_dir, args.sitename)
 
     if args.run_now:
         print("\nStarting analysis...")
@@ -456,7 +449,7 @@ def main() -> None:
         print("\nRuns Complete")
         print(f"Successful: {len(run_results)}")
         print(f"Failed    : {len(run_failures)}")
-        if args.mode != "single": write_run_report(run_results, run_failures, base_dir, args.sitename)
+        if len(aoi_paths) > 1: write_run_report(run_results, run_failures, base_dir, args.sitename)
         
         # tell gui a run failed
         if len(run_failures) > 0:
