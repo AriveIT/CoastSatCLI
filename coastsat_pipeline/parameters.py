@@ -63,7 +63,7 @@ def print_options():
 @dataclass
 class Parameters:
 
-    apply_tide_correction = False # False means skip slope estimation and tide correction
+    apply_tide_correction = True # False means skip slope estimation and tide correction
     
     # How much to put in log file
     # "none" = nothing - everything printed to terminal. Note: this is a string, not a None

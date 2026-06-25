@@ -387,3 +387,6 @@ def get_sim_tif_name(deg_type, base_dir):
 
 def get_ps_tif_name(base_dir):
     return os.path.join(base_dir, "pansharpened", f"ms_ps.tif") # can only be ms
+
+def get_gs_tif_name(filename, base_dir):
+    return os.path.join(base_dir, "gaussian_deg", filename)

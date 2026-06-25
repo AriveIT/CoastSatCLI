@@ -29,24 +29,29 @@ def get_gaussian_kernel(radius, variance, res):
 
 # wastes some flops, but it's simple and readable
 def strided_convolution(im, kernel, stride):
-    if len(im.shape) == 3: output = np.stack([convolve2d(im[:,:,i], kernel, mode='valid') for i in range(im.shape[-1])], axis=2)
+    if len(im.shape) == 3:
+        if len(kernel.shape) == 2:
+            output = np.stack([convolve2d(im[:,:,i], kernel, mode='valid') for i in range(im.shape[-1])], axis=2)
+        elif len(kernel.shape) == 3:
+            output = np.stack([convolve2d(im[:,:,i], kernel[:,:,i], mode='valid') for i in range(im.shape[-1])], axis=2)
     elif len(im.shape) == 2: output = convolve2d(im, kernel, mode='valid')
     return output[::stride,::stride]
 
-def gaussian_degradation(bands, source_res, target_res, kernel_radius):
+def kernel_degradation(bands, source_res, target_res, kernel_radius, kernel=None):
     adj_res, mul = get_adj_res(target_res, source_res)
-    sd = get_sd_from_fwfm(adj_res)
-    kernel = get_gaussian_kernel(kernel_radius, sd**2, source_res)
+    if kernel is None:
+        sd = get_sd_from_fwfm(adj_res)
+        kernel = get_gaussian_kernel(kernel_radius, sd**2, source_res)
     output = strided_convolution(bands, kernel, stride=mul)
     return output, adj_res, mul
 
-def calc_offsets(source_res, kernel_radius, adj_res):
+def calc_offsets(source_res, kernel_radius):
     x_offset = kernel_radius * source_res
     y_offset = -x_offset
     return x_offset, y_offset
 
 def save_gaus_deg_tif(filename, bands, source_res, kernel_radius, adj_res, in_proj, in_gt):
-    x_offset, y_offset = calc_offsets(source_res, kernel_radius, adj_res)
+    x_offset, y_offset = calc_offsets(source_res, kernel_radius)
     ux = in_gt[0] + x_offset
     uy = in_gt[3] + y_offset
 

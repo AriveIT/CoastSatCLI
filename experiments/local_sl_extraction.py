@@ -6,6 +6,7 @@ from scipy.stats import ks_2samp
 from coastsat import SDS_shoreline, SDS_tools
 import modified_coastsat
 import wv_utils as wv
+import spectral_unmixing as su
 
 
 ###############################
@@ -96,6 +97,30 @@ def filter_contour_points_2(contours_pxl, ref_tree, zone_indicators, cur_zone):
     _, idx = ref_tree.query(contours_pxl)
     zones = zone_indicators[idx]
     return contours_pxl[zones == cur_zone]
+
+# for custom spectral unmixing
+def local_sl_extraction_su(sim_bands, masks, thresh_func, sds_data, im_ind=None, percentages=None):
+    thresholds = []
+    final_contour = []
+    assert (im_ind is None) != (percentages is None) # only one of them are filled (for clarity of intention)
+
+    for mask in masks:
+
+        if percentages is None:
+            percentages = su.spectral_unmixing_1(sim_bands, im_ind, mask).reshape(192, 360)
+        threshold = thresh_func(percentages, sds_data["cloud_mask"], mask)
+        thresholds.append(threshold)
+        contours = modified_coastsat.find_wl_contours1(percentages, sds_data["cloud_mask"], mask, threshold)
+
+        contours = SDS_shoreline.process_shoreline(contours, sds_data["cloud_mask"], sds_data["im_nodata"],
+                                        sds_data["georef"], sds_data["image_epsg"], sds_data["sds_settings"])
+        contours_pxl = SDS_tools.convert_world2pix(contours, sds_data["georef"])
+        if len(contours_pxl) > 0: final_contour.append(contours_pxl)
+        
+    final_contour_pxl = np.concatenate(final_contour)[:,[1,0]]
+    final_contour_world = SDS_tools.convert_pix2world(final_contour_pxl, sds_data["georef"])
+
+    return final_contour_world, thresholds
 
 #############################
 # local_sl_extraction Take 1
