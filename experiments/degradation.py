@@ -3,6 +3,8 @@ import skgstat
 from scipy.signal import convolve2d
 from scipy.stats import multivariate_normal
 import wv_utils as wv
+from osgeo import gdal
+import modified_coastsat
 
 ######################
 # Gaussian Degradation
@@ -37,7 +39,7 @@ def strided_convolution(im, kernel, stride):
     elif len(im.shape) == 2: output = convolve2d(im, kernel, mode='valid')
     return output[::stride,::stride]
 
-def kernel_degradation(bands, source_res, target_res, kernel_radius, kernel=None):
+def kernel_deg(bands, source_res, kernel_radius, target_res, kernel=None):
     adj_res, mul = get_adj_res(target_res, source_res)
     if kernel is None:
         sd = get_sd_from_fwfm(adj_res)
@@ -99,3 +101,43 @@ def match_snr(source_bands, source_snr, target_snr):
     # return noise
     noise = np.random.randn(*source_bands.shape) * add_std
     return np.clip(source_bands + noise, 0, 1)
+
+######################
+# Pansharpening
+######################
+# takes gt of source image and finds bounds of simulated image derived from source image
+def calc_bounds(source_res, kernel_radius, adj_res, bands_shape, in_gt):
+    x_offset, y_offset = calc_offsets(source_res, kernel_radius)
+    ux = in_gt[0] + x_offset
+    uy = in_gt[3] + y_offset
+    lx = ux + bands_shape[1] * adj_res
+    ly = uy - bands_shape[0] * adj_res
+    return ux, uy, lx, ly
+
+def double_resolution(warp_fn, gs_deg_30_fn, adj_res, bounds):
+    ux, uy, lx, ly = bounds
+    options = gdal.WarpOptions(xRes=adj_res / 2, yRes=adj_res / 2,
+                                outputBounds=[min(ux,lx), min(uy,ly), max(ux,lx), max(uy,ly)],
+                                resampleAlg=gdal.GRA_Bilinear,
+                                targetAlignedPixels=False)
+    gdal.Warp(warp_fn, gs_deg_30_fn, options=options)
+
+def pansharpen_gaussian_deg(warp_fn, pan_band):
+    colour_bands = wv.load_sim_tif(warp_fn)
+    colour_bands, pan_band = normalize_im_dim([colour_bands, pan_band])
+
+    cloud_mask = np.zeros(pan_band.shape, dtype=bool)
+    bands_to_sharpen = [0, 1, 2]
+    ps_bands = modified_coastsat.pansharpen(colour_bands[:,:,bands_to_sharpen], pan_band, cloud_mask)
+    im_ms_ps = np.append(ps_bands, colour_bands[:,:,3:], axis=2)
+    im_ms_ps = np.clip(im_ms_ps, 0, 1)
+    return im_ms_ps
+
+def save_ps_tif(ps_fn, im_ms_ps, bounds, adj_res, proj):
+    gt = (bounds[0], adj_res / 2, 0.0, bounds[1], 0.0, -adj_res / 2)
+    wv.write_geotiff(ps_fn, im_ms_ps, proj=proj, gt=gt)
+
+def normalize_im_dim(ims):
+    min_col = min([im.shape[0] for im in ims])
+    min_row = min([im.shape[1] for im in ims])
+    return [im[:min_col, :min_row] for im in ims]
