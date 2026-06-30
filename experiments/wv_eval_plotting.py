@@ -43,7 +43,7 @@ def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_point
     return fig
     
 
-def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, im_rgb, contours_pxl=None, s=None):
+def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, im_rgb, title=None, contours_pxl=None, s=None):
     s = s or 1
     outlier_idx = m.get_outlier_idx(metric, outlier_thresholds)
     dists_no_outliers = np.delete(metric, outlier_idx)
@@ -53,8 +53,9 @@ def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, im_rgb,
     cmap = mpl.cm.cool
     col = cmap((dists_no_outliers - min_dist) / (max_dist - min_dist))
 
-    fig, ax = plt.subplots(figsize=(40, 20))
+    fig, ax = plt.subplots(figsize=(20, 10))
     ax.axis(False)
+    ax.set_title(title)
 
     # reference sl
     ax.scatter(ref_sl_no_outliers[:,0], ref_sl_no_outliers[:,1], c=col, s=s)
@@ -154,14 +155,15 @@ def plot_comparison_barplot(entries_arr, titles):
 ###############################
 # Best Method Functions
 ###############################
-def plot_best_score_per_point(metric, ref_sl_points_pxl, im_rgb):
+def plot_best_score_per_point(metric, ref_sl_points_pxl, im_rgb, sitename, sim_sat):
 
     min_dist, max_dist = np.min(metric), np.max(metric)
     cmap = mpl.cm.cool
     col = cmap((metric - min_dist) / (max_dist - min_dist))
 
-    fig, ax = plt.subplots(figsize=(40, 20))
+    fig, ax = plt.subplots(figsize=(20, 10))
     ax.axis(False)
+    ax.set_title(f"{sitename}_{sim_sat}: Best Score Per Point")
 
     # reference sl
     ax.scatter(ref_sl_points_pxl[:,0], ref_sl_points_pxl[:,1], c=col, s=1)
@@ -170,15 +172,17 @@ def plot_best_score_per_point(metric, ref_sl_points_pxl, im_rgb):
 
     norm = mpl.colors.Normalize(min_dist, max_dist)
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
-                ax=ax, orientation='vertical', label='metric')
+                ax=ax, orientation='vertical', label='Distance to nearest extracted point',
+                fraction=0.04, pad=0.04)
     
     return fig
 
-def plot_best_method_per_point(idx, methods, ref_sl_points_pxl, im_rgb):
+def plot_best_method_per_point(idx, methods, ref_sl_points_pxl, im_rgb, sitename, sim_sat):
     cmap = get_all_of_em_cmap()
 
-    fig, ax = plt.subplots(figsize=(40, 20))
+    fig, ax = plt.subplots(figsize=(20, 10))
     ax.axis(False)
+    ax.set_title(f"{sitename}_{sim_sat}: Best Method Per Point")
 
     ax.scatter(ref_sl_points_pxl[:,0], ref_sl_points_pxl[:,1], c=cmap(idx/(len(methods) - 1)), cmap=cmap, s=1)
     ax.imshow(im_rgb, interpolation=None)
@@ -188,14 +192,15 @@ def plot_best_method_per_point(idx, methods, ref_sl_points_pxl, im_rgb):
     
     return fig
 
-def plot_best_score_per_transect(metric, transects_pix, ref_sl_points_pxl, im_rgb):
+def plot_best_score_per_transect(metric, transects_pix, ref_sl_points_pxl, im_rgb, sitename, sim_sat):
 
     min_dist, max_dist = np.min(metric), np.max(metric)
     cmap = mpl.cm.cool
     col = cmap((metric - min_dist) / (max_dist - min_dist))
 
-    fig, ax = plt.subplots(figsize=(40, 20))
+    fig, ax = plt.subplots(figsize=(20, 10))
     ax.axis(False)
+    ax.set_title(f"{sitename}_{sim_sat}: Best Score Per Transect")
 
     # reference sl
     ax.scatter(ref_sl_points_pxl[:,0], ref_sl_points_pxl[:,1], c="white", s=1)
@@ -208,15 +213,16 @@ def plot_best_score_per_transect(metric, transects_pix, ref_sl_points_pxl, im_rg
 
     norm = mpl.colors.Normalize(min_dist, max_dist)
     fig.colorbar(mpl.cm.ScalarMappable(norm=norm, cmap=cmap),
-                ax=ax, orientation='vertical', label='metric')
+                ax=ax, orientation='vertical', label='Transect Cross Distance MAE')
     
     return fig
 
-def plot_best_method_per_transect(idx, methods, transects_pix, ref_sl_points_pxl, im_rgb):
+def plot_best_method_per_transect(idx, methods, transects_pix, ref_sl_points_pxl, im_rgb, sitename, sim_sat):
     cmap = get_all_of_em_cmap()
 
-    fig, ax = plt.subplots(figsize=(40, 20))
+    fig, ax = plt.subplots(figsize=(20, 10))
     ax.axis(False)
+    ax.set_title(f"{sitename}_{sim_sat}: Best Score Per Transect")
 
     ax.scatter(ref_sl_points_pxl[:,0], ref_sl_points_pxl[:,1], c="white", s=1)
     ax.imshow(im_rgb, interpolation=None)
@@ -229,17 +235,15 @@ def plot_best_method_per_transect(idx, methods, transects_pix, ref_sl_points_pxl
     
     return fig
 
-def violin_plots(metric, methods, outlier_t=None, box_instead=False, sort_methods=False):
+def violin_plots(metric, methods, title, ylim=None, outlier_idx=None, box_instead=False, sort_methods=False):
     no_outlier_performances = []
     valid_methods = []
     means = []
     for i in range(len(methods)):
-        no_outlier = metric[i, ~np.isnan(metric[i])]
+        no_outlier = metric[i]
+        if outlier_idx is not None:  no_outlier = no_outlier[~outlier_idx]
+        no_outlier = no_outlier[~np.isnan(no_outlier)]
         
-        if outlier_t:
-            no_outlier = metric[i, (metric[i] >= outlier_t[0]) & (metric[i] <= outlier_t[1])]
-        if len(no_outlier) == 0:
-            continue
         no_outlier_performances.append(no_outlier)
         valid_methods.append(methods[i])
         means.append(np.median(no_outlier))
@@ -249,19 +253,28 @@ def violin_plots(metric, methods, outlier_t=None, box_instead=False, sort_method
         no_outlier_performances = [no_outlier_performances[idx] for idx in sorted_idx]
         valid_methods = [valid_methods[idx] for idx in sorted_idx]
 
-    fig, ax = plt.subplots(figsize=(16, 8))
+    fig, ax = plt.subplots(figsize=(16, 8), tight_layout=True)
+    ax.set_title(title)
+    if ylim is not None: ax.set_ylim(ylim)
     if box_instead:
         ax.boxplot(no_outlier_performances)
     else:
         ax.violinplot(no_outlier_performances, showmedians=True)
     ax.set_xticks([y + 1 for y in range(len(valid_methods))], labels=valid_methods, rotation=90)
-    return fig
+    return fig, ax
 
-def plot_best_method_counts(best_per_unit_idx, methods):
+def plot_best_method_counts(best_per_unit_idx, methods, title, pie_instead=False):
     idx, counts = np.unique(best_per_unit_idx, return_counts=True)
     fig, ax = plt.subplots()
-    ax.bar(methods[idx], counts)
-    ax.tick_params(axis='x', labelrotation=90)
+    if not pie_instead:
+        ax.bar(methods[idx], counts)
+        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_ylabel("Count")
+        ax.set_title(title)
+    else:
+        cmap = get_all_of_em_cmap()
+        wedges, _ = ax.pie(counts, colors=cmap(np.arange(len(methods)) / len(methods)))
+        ax.set_title(title)
     return fig
 
 #######################

@@ -69,6 +69,10 @@ def evaluate_methods(
                 index = ensemble1(sim_bands, ensemble_index_functions, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
             elif index_fn == ensemble2:
                 index = ensemble2(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
+            elif index_fn == "spectral_unmixing":
+                im_ind = ensemble2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
+                index = su.spectral_unmixing_1(sim_bands, im_ind, sds_data)
+                
             else:
                 index = index_fn(im_flat)
             index = index.reshape(sim_bands.shape[:-1])
@@ -106,7 +110,8 @@ def evaluate_methods(
             shoreline_metric.append(shoreline_dist)
             transect_metric.append(transect_dist)
 
-    methods = np.array([index_fn.__name__ + "__" + thresh_fn.__name__ for index_fn in index_functions for thresh_fn in threshold_functions])
+    index_fn_names = [index_fn if type(index_fn) == str else index_fn.__name__ for index_fn in index_functions]
+    methods = np.array([index_fn_name + "__" + thresh_fn.__name__ for index_fn_name in index_fn_names for thresh_fn in threshold_functions])
     shoreline_metric = np.array(shoreline_metric)
     transect_metric = np.array(transect_metric)
     info["thresholds"] = thresholds
@@ -158,13 +163,13 @@ def organize_metrics(shoreline_metric, transect_metric, methods, outlier_idx=Non
         ))
     return entries, outlier_idx
 
-def print_metrics(entries, sort_variable=None, first_col_width=35, col_width=12, section_buffer=3):
+def print_metrics(entries, sort_variable=None, file=None, first_col_width=35, col_width=12, section_buffer=3):
     if sort_variable:
         entries = sorted(entries, key=lambda entry: float('inf') if np.isnan(entry[sort_variable]) else entry[sort_variable])
 
     # headers
-    print(f"{''.ljust(first_col_width)} {'sl_mean'.ljust(col_width)} {'sl_mean_all'.ljust(col_width)} {'sl_std'.ljust(col_width)} {'sl_outlier'.ljust(col_width+section_buffer)}" 
-        f"{'t_mean'.ljust(col_width)} {'t_std'.ljust(col_width)} {'t_mae'.ljust(col_width)}")
+    print(f"{f'Sorted by {sort_variable}'.ljust(first_col_width)} {'sl_mean'.ljust(col_width)} {'sl_mean_all'.ljust(col_width)} {'sl_std'.ljust(col_width)} {'sl_outlier'.ljust(col_width+section_buffer)}" 
+        f"{'t_mean'.ljust(col_width)} {'t_std'.ljust(col_width)} {'t_mae'.ljust(col_width)}", file=file)
     
     # body
     for entry in entries:
@@ -178,4 +183,4 @@ def print_metrics(entries, sort_variable=None, first_col_width=35, col_width=12,
         t_mae_string = f"{entry['t_mae']:.3f}".ljust(col_width)
 
         print(f"{(entry['method'] + ':').ljust(first_col_width)} {mean_string} {all_mean_string} {std_string} {outlier_string}   "
-            f"{t_mean_string} {t_std_string} {t_mae_string}")
+            f"{t_mean_string} {t_std_string} {t_mae_string}", file=file)

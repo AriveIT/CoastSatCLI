@@ -59,6 +59,78 @@ def ref_sl_to_pxl(ref_sl_list, georef):
 
     return ref_sl_pxl_list 
 
+# load low res sim image
+def load_sim_tif_data(sim_sat, base_dir):
+    sim_fn = get_sim_tif_name(sim_sat, base_dir)
+    sim = gdal.Open(sim_fn, gdal.GA_ReadOnly)
+    georef = sim.GetGeoTransform()
+    sim_bands = load_sim_tif(sim_fn)
+    
+    # initialize empty cloud mask
+    im_nodata, cloud_mask = np.full(sim_bands.shape[:-1], False), np.full(sim_bands.shape[:-1], False)
+    return sim_bands, georef, im_nodata, cloud_mask
+
+def load_ref_sl_data(ref_sl_path, georef, sim_bands_shape):
+    ref_sl_list = load_ref_sl(ref_sl_path)
+    ref_sl_pxl_list = ref_sl_to_pxl(ref_sl_list, georef)
+    ref_sl_points = shoreline_to_points(ref_sl_list, delta=0.5)
+    sl_buffer = create_shoreline_buffer(sim_bands_shape[:-1], ref_sl_pxl_list, 10)
+    return ref_sl_points, sl_buffer
+
+def transects_world2pix(transects, georef):
+    transects_0_pxl = SDS_tools.convert_world2pix(transects[:,0,:], georef)
+    transects_1_pxl = SDS_tools.convert_world2pix(transects[:,1,:], georef)
+    return np.swapaxes(np.stack([transects_0_pxl, transects_1_pxl]), 0, 1)
+
+def crop_to_im_mask(data, sim_bands_shape):
+    mask = (data[...,0] > 0) & (data[...,0] < sim_bands_shape[1])
+    mask &= (data[...,1] > 0) & (data[...,1] < sim_bands_shape[0])
+    return mask
+
+def init(sim_sat, base_dir, ref_sl_path, transect_path, image_epsg):
+    sim_bands, georef, im_nodata, cloud_mask = load_sim_tif_data(sim_sat, base_dir)
+    transects = np.array(list(SDS_tools.transects_from_geojson(transect_path).values()))
+    ref_sl_points, sl_buffer = load_ref_sl_data(ref_sl_path, georef, sim_bands.shape)
+
+    # convert transects and reference shoreline to pixel space
+    transects_pix = transects_world2pix(transects, georef)
+    ref_sl_points_pxl = SDS_tools.convert_world2pix(ref_sl_points, georef)
+
+    # crop shoreline and transects to image (borders changes with kernel width)
+    mask = crop_to_im_mask(ref_sl_points_pxl, sim_bands.shape)
+    ref_sl_points_pxl = ref_sl_points_pxl[mask]
+    ref_sl_points = ref_sl_points[mask]
+
+    mask = crop_to_im_mask(transects_pix, sim_bands.shape)
+    mask = mask[:,0] | mask[:,1]
+    transects_pix = transects_pix[mask]
+    transects = transects[mask]
+
+    # data/settings dictionaries
+    sds_settings = {
+        'output_epsg': image_epsg,
+        'max_dist_ref': 400,
+        'min_length_sl': 150, # 500
+        'dist_clouds': 30,
+    }
+
+    collider_settings = dict(
+        past_dist = 10,
+        along_dist = 25,
+        min_chainage = -10
+    )
+
+    sds_data = dict(
+        cloud_mask=cloud_mask,
+        sl_buffer=sl_buffer,
+        im_nodata=im_nodata,
+        georef=georef,
+        image_epsg=image_epsg,
+        sds_settings=sds_settings
+    )
+
+    return sim_bands, georef, im_nodata, cloud_mask, transects, transects_pix, ref_sl_points, ref_sl_points_pxl, sds_settings, collider_settings, sds_data
+
 ##########################
 # EDA
 ##########################
@@ -382,8 +454,8 @@ def get_coreg_tif_name(name, base_dir):
 def get_degraded_tif_name(name, deg_type, base_dir):
     return os.path.join(base_dir, deg_type, f"{name}_degraded.tif")
 
-def get_sim_tif_name(deg_type, base_dir):
-    return os.path.join(base_dir, deg_type, "sim.tif")
+def get_sim_tif_name(sat, base_dir):
+    return os.path.join(base_dir, "gaussian_deg", sat + "_sim.tif")
 
 def get_ps_tif_name(base_dir):
     return os.path.join(base_dir, "pansharpened", f"ms_ps.tif") # can only be ms
