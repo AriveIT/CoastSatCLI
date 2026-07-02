@@ -4,6 +4,9 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
 import metrics as m
+import wv_eval
+
+from coastsat import SDS_tools
 
 def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_points_pxl, im_rgb, contours_pxl=None, s=None):
     s = s or 1
@@ -104,13 +107,12 @@ def plot_comparison(entries1, entries2, opt1, opt2, metric_names, sl_lim=50):
 
     return fig
 
-def plot_comparison_barplot(entries_arr, titles):
+def plot_comparison_barplot(entries_arr, titles, plot_title):
     methods = [e["method"] for e in entries_arr[0]]
     metrics = list(entries_arr[0][0].keys())[1:]
-    # metrics = list(entries_arr[0][0].keys())[:]
-    print(metrics)
 
     fig, ax = plt.subplots(len(metrics), 1, figsize=(20, 16), tight_layout=True)
+    fig.suptitle(plot_title)
 
     for i, metric in enumerate(metrics):
     
@@ -138,19 +140,28 @@ def plot_comparison_barplot(entries_arr, titles):
             multiplier += 1
 
 
+        ax[i].axhline(0, c="black", linestyle="--", alpha=0.5)
         ax[i].set_title(metric)
         ax[i].legend(loc='upper right', ncols=3)
         ax[i].set_ylim(-1, 1)
         ax[i].tick_params(
             axis='x',          # changes apply to the x-axis
             labelbottom=False)
-        ax[-1].set_xticks(x + .5 * (len(titles) - 1) * width)
     
     ax[-1].tick_params(
             axis='x',          # changes apply to the x-axis
             labelbottom=True)
     ax[-1].set_xticks(x + .5 * (len(titles) - 1) * width, methods, rotation='vertical')
     return fig
+
+def plot_method(index, threshold, method, sim_bands, sds_data, ref_sl_points, ref_sl_points_pxl, transects, collider_settings, outlier_idx, georef, sitename, sim_sat):
+    contours = wv_eval.get_contours(index.reshape(sim_bands.shape[:-1]), threshold, sds_data)
+    sl_dists = m.get_nearest_distance(ref_sl_points, contours)
+    t_dists, _ = m.get_median_distances(transects, ref_sl_points, contours, collider_settings)
+
+    contour_pxl = SDS_tools.convert_world2pix(contours, georef)
+    title = sitename + "_" + sim_sat + "_" + method + f": sl_mean: {np.mean(sl_dists[~outlier_idx]):.3f}, {np.mean(sl_dists):.3f}; t_mae: {np.nanmean(np.abs(t_dists)):.3f}"
+    return plot_shoreline_metric(sl_dists, (0, 25), ref_sl_points_pxl, sim_bands[:,:,[2, 1, 0]], title, contours_pxl=contour_pxl)
 
 ###############################
 # Best Method Functions
@@ -266,15 +277,15 @@ def violin_plots(metric, methods, title, ylim=None, outlier_idx=None, box_instea
 def plot_best_method_counts(best_per_unit_idx, methods, title, pie_instead=False):
     idx, counts = np.unique(best_per_unit_idx, return_counts=True)
     fig, ax = plt.subplots()
+    ax.set_title(title)
     if not pie_instead:
         ax.bar(methods[idx], counts)
         ax.tick_params(axis='x', labelrotation=90)
         ax.set_ylabel("Count")
-        ax.set_title(title)
     else:
         cmap = get_all_of_em_cmap()
-        wedges, _ = ax.pie(counts, colors=cmap(np.arange(len(methods)) / len(methods)))
-        ax.set_title(title)
+        wedges, texts = ax.pie(counts, colors=cmap(np.arange(len(methods)) / (len(methods)-1))[idx])
+        # ax.legend(wedges, methods[idx], ncols=3)
     return fig
 
 #######################
