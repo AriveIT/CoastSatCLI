@@ -3,6 +3,7 @@ based on kv coastsat
 """
 
 import os, sys
+import traceback
 import numpy as np
 import pickle
 import warnings
@@ -17,6 +18,8 @@ import re
 import skimage.morphology as morphology
 import skimage.measure as measure
 import sklearn.decomposition as decomposition
+from scipy.spatial import cKDTree
+import sklearn
 
 from osgeo import gdal
 from pyproj import CRS
@@ -25,6 +28,8 @@ from pylab import ginput
 # coastsat modules
 sys.path.insert(0, os.pardir)
 from coastsat import SDS_download, SDS_preprocess, SDS_shoreline, SDS_tools, SDS_classify
+
+from experiments import spectral_unmixing as su, indices, thresholding
 
 def retrieve_images(inputs):
     """
@@ -1017,3 +1022,190 @@ def get_intersections(transect, sl, settings):
         return None
     
     return xy_rot
+
+# no NN
+# uses spectral unmixing
+def extract_shorelines(metadata, settings, print_errors=False):
+    """
+    Main function to extract shorelines from satellite images
+    """
+
+    sitename = settings['inputs']['sitename']
+    filepath_data = settings['inputs']['filepath']
+    filepath_models = os.path.join(os.getcwd(), 'classification', 'models')
+    output = dict([])
+    filepath_jpg = os.path.join(filepath_data, 'jpg_files', 'detection')
+    if not os.path.exists(filepath_jpg):
+        os.makedirs(filepath_jpg)
+    plt.close('all')
+
+    print('Mapping shorelines:')
+    default_min_length_sl = settings['min_length_sl']
+
+    # Cache to avoid recomputing identical shoreline buffers
+    buffer_cache = {}
+
+    transects = np.array(list(SDS_tools.transects_from_geojson(settings["inputs"]["transect_geojson"]).values()))
+    cloud_covers = {satname: [] for satname in metadata.keys()}
+
+    for satname in metadata.keys():
+
+        filepath = SDS_tools.get_filepath(settings['inputs'],satname)
+        filenames = metadata[satname]['filenames']
+
+        output_timestamp = []
+        output_shoreline = []
+        output_filename = []
+        output_cloudcover = []
+        output_geoaccuracy = []
+        output_idxkeep = []
+        output_t_mndwi = []
+        output_transect_origin_classes = []
+        output_cloud_kdtrees = []
+
+        settings['min_length_sl'] = 200 if satname == 'L7' else default_min_length_sl
+
+        last_pct = -1
+        cloud_skipped = 0
+        no_data_skipped = 0
+        error_skipped = 0
+        skip_skipped = 0
+        cached = 0
+        computed = 0
+        for i in range(len(filenames)):
+            pct = int(((i + 1) / len(filenames)) * 100)
+            # print(f"\r{satname}: {pct}%", flush=True)
+            if pct != last_pct:
+                print(f"\r{satname}: {pct}%", flush=True, end="")
+                last_pct = pct
+
+            fn = SDS_tools.get_filenames(filenames[i], filepath, satname)
+            try:
+                im_ms, georef, cloud_mask, _, _, im_nodata = preprocess_single(
+                    fn, satname, settings['cloud_mask_issue'], settings['pan_off'], settings['s2cloudless_prob'])
+            except Exception as e:
+                if print_errors: print(f'\nCould not preprocess this image: {filenames[i]}, reason: {e}')
+                error_skipped += 1
+                continue
+
+            image_epsg = metadata[satname]['epsg'][i]
+
+            cloud_cover_combined = np.divide(sum(sum(cloud_mask.astype(int))),
+                                             (cloud_mask.shape[0]*cloud_mask.shape[1]))
+            if cloud_cover_combined > 0.99:
+                no_data_skipped += 1
+                continue
+            cloud_mask_adv = np.logical_xor(cloud_mask, im_nodata)
+            cloud_cover = np.divide(sum(sum(cloud_mask_adv.astype(int))),
+                                    (sum(sum((~im_nodata).astype(int)))))
+            
+            cloud_covers[satname].append(cloud_cover)
+            if cloud_cover > settings['cloud_thresh']:
+                cloud_skipped += 1
+                continue
+
+            buffer_key = (tuple(cloud_mask.shape), tuple(np.round(georef, 6)))
+            if buffer_key in buffer_cache:
+                cached += 1
+                im_ref_buffer = buffer_cache[buffer_key]
+            else:
+                computed += 1
+                im_ref_buffer = SDS_shoreline.create_shoreline_buffer(cloud_mask.shape, georef, image_epsg, settings)
+                buffer_cache[buffer_key] = im_ref_buffer
+
+
+            im_mndwi = None
+            try:
+                # im_mndwi = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
+                # sds_data = {
+                #     "cloud_mask": cloud_mask,
+                #     "sl_buffer": im_ref_buffer
+                # }
+                # im_mndwi = su.spectral_unmixing_2(im_ms, im_ind, sds_data).reshape(cloud_mask.shape)
+                im_mndwi = indices.mndwi(im_ms.reshape(-1, im_ms.shape[-1])).reshape(im_ms.shape[:-1])
+                # im_mndwi = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer).reshape(im_ms.shape[:-1])
+                
+                # print(f"\nensemble2 nan count: {np.sum(np.isnan(im_ind))}")
+                # print(f"spectral unmixing nan count: {np.sum(np.isnan(im_mndwi))}")
+
+                contours_mwi, t_mndwi = SDS_shoreline.find_wl_contours1(im_mndwi, cloud_mask, im_ref_buffer)
+            except Exception as e:
+                if print_errors:
+                    print(f'\nCould not map shoreline for this image: {filenames[i]}, reason: {e}')
+                    traceback.print_exc()
+                
+                error_skipped += 1
+                continue
+
+            shoreline = SDS_shoreline.process_shoreline(contours_mwi, cloud_mask_adv, im_nodata,
+                                          georef, image_epsg, settings)
+
+            if settings['check_detection'] or settings['save_detection_plots']:
+                date = filenames[i][:19]
+                if not settings['check_detection']:
+                    plt.ioff()
+                dummy_labels = np.zeros((*cloud_mask.shape, 3), dtype=int)
+                dummy_labels[:,:,0] = 1
+                skip_image = SDS_shoreline.show_detection(im_ms, im_mndwi, cloud_mask, dummy_labels, shoreline,
+                                            image_epsg, georef, settings, date, satname)
+                if skip_image:
+                    continue
+
+            # determine if transect origins are on land or water
+            if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
+            if settings.get("plot_mndwi", False): SDS_shoreline.plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
+            on_water = SDS_shoreline.get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
+
+            # build cloud mask kd tree
+            cloud_idx = np.column_stack(np.where(cloud_mask))
+            cloud_coords = SDS_tools.convert_pix2world(cloud_idx, georef)
+            cloud_coords = SDS_tools.convert_epsg(cloud_coords, image_epsg, settings['output_epsg'])
+            cloud_kdtree = cKDTree(cloud_coords)
+
+            output_timestamp.append(metadata[satname]['dates'][i])
+            output_shoreline.append(shoreline)
+            output_filename.append(filenames[i])
+            output_cloudcover.append(cloud_cover)
+            output_geoaccuracy.append(metadata[satname]['acc_georef'][i])
+            output_idxkeep.append(i)
+            output_t_mndwi.append(t_mndwi)
+            output_transect_origin_classes.append(on_water)
+            
+            # for cloud intersections
+            output_cloud_kdtrees.append(cloud_kdtree)
+
+        output[satname] = {
+            'dates': output_timestamp,
+            'shorelines': output_shoreline,
+            'filename': output_filename,
+            'cloud_cover': output_cloudcover,
+            'geoaccuracy': output_geoaccuracy,
+            'idx': output_idxkeep,
+            'MNDWI_threshold': output_t_mndwi,
+            'transect_origin_classes': output_transect_origin_classes,
+            'cloud_kdtrees': output_cloud_kdtrees,
+        }
+
+        print()
+        print(f"    {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
+                f"{no_data_skipped} skipped due to no data, {error_skipped} skipped due to errors, {skip_skipped} skipped by user.")
+        print(f"    Shoreline buffer computed {computed} times and cached {cached} times")
+
+    if plt.get_fignums():
+        plt.close()
+
+    output = SDS_tools.merge_output(output)
+    output = SDS_tools.remove_duplicates(output)
+    output = SDS_tools.remove_inaccurate_georef(output, 10)
+
+
+    filepath = filepath_data
+
+    # save cloud kdtrees in multiple files so they can be loaded separately for better memory usage
+    SDS_shoreline.save_cloud_kdtrees(output["cloud_kdtrees"], 50, filepath, sitename)
+    del(output["cloud_kdtrees"])
+
+    with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
+        pickle.dump(output, f)
+
+    return output

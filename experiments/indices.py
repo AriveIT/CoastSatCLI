@@ -1,4 +1,4 @@
-from thresholding import apply_buffer_and_mask
+from experiments.thresholding import apply_buffer_and_mask
 import numpy as np
 
 BLUE_IDX, GREEN_IDX, RED_IDX, NIR_IDX, SWIR1_IDX, SWIR2_IDX = 0, 1, 2, 3, 4, 5
@@ -83,13 +83,13 @@ def ensemble1(sim_bands, ensemble_index_functions, cloud_mask, sl_buffer):
 
 def ensemble2(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
     ensemble_index = np.zeros(sim_bands.shape[:-1])
+    im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
+
     for ind_func in ensemble_index_functions:
-        
-        im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
         index_im = ind_func(im_flat).reshape(sim_bands.shape[:-1])
         threshold = thresh_fn(index_im, cloud_mask, sl_buffer)
-
         ensemble_index += index_im < threshold
+        
     return ensemble_index / len(ensemble_index_functions)
 
 ################
@@ -101,3 +101,19 @@ def unpack_bands(sample):
 def standardize(data, minimum, maximum):
     return (data - minimum) / (maximum - minimum)
 
+def get_ensemble_list():
+    return [
+        mndwi,
+        ndwi,
+        awei_ns,
+        awei_sh,
+        scowi,
+        wi2015,
+        andwi,
+        wri,
+        ewi,
+        nwi,
+        wi2019,
+        tct_wetness,
+        ddwi,
+    ]

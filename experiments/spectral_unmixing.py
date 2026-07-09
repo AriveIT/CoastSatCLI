@@ -1,5 +1,5 @@
 import numpy as np
-from thresholding import otsu, apply_buffer_and_mask
+from experiments.thresholding import otsu, apply_buffer_and_mask
 from scipy.signal import find_peaks
 import skimage.filters as filters
 
@@ -28,7 +28,7 @@ def get_threshold(im_ind, sds_data):
 
 def get_candidate_signature(im_ind, sim_bands, sds_data):
     thresh = get_threshold(im_ind, sds_data)
-    water_pixels = sim_bands[sds_data["sl_buffer"] & (im_ind < thresh)]
+    water_pixels = sim_bands[sds_data["sl_buffer"] & ~sds_data["cloud_mask"] & (im_ind < thresh)]
     candidate_signature = np.mean(water_pixels, axis=0)
     return candidate_signature
 
@@ -47,9 +47,16 @@ def get_signature_percentages(sim_bands, projections):
     after_norms = np.linalg.norm(sim_bands.reshape(-1, 6) - projections, axis=1)
     return after_norms / total_norms
 
+def cosine_similarity(sim_bands, signature):
+    return np.dot(sim_bands, signature) / (np.linalg.norm(sim_bands, axis=2) * np.linalg.norm(signature))
 
 def spectral_unmixing_1(sim_bands, im_ind, sds_data):
     candidate_signature = get_candidate_signature(im_ind, sim_bands, sds_data)
     proj_coefs = get_capped_proj_coefs(sim_bands, candidate_signature)
     projections = np.matmul((proj_coefs).reshape(-1, 1), candidate_signature.reshape(1, -1))
     return get_signature_percentages(sim_bands, projections)
+
+
+def spectral_unmixing_2(sim_bands, im_ind, sds_data):
+    candidate_signature = get_candidate_signature(im_ind, sim_bands, sds_data)
+    return cosine_similarity(sim_bands, candidate_signature)
