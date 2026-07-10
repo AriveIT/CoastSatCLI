@@ -123,6 +123,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 error_skipped += 1
                 continue
 
+            im_ms = im_ms[:,:,:5] # to support using 6 band imagery from other workflows
             # plot_cloud_masks(im_ms, cloud_mask, settings, filenames[i][:19])
 
             image_epsg = metadata[satname]['epsg'][i]
@@ -153,7 +154,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             im_classif, im_labels = classify_image_NN(im_ms, cloud_mask, min_beach_area_pixels, clf)
 
-            im_mndwi = None
+            im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
             if settings['adjust_detection']:
                 date = filenames[i][:19]
                 skip_image, shoreline, t_mndwi = adjust_detection(im_ms, cloud_mask, im_nodata, im_labels,
@@ -165,7 +166,6 @@ def extract_shorelines(metadata, settings, print_errors=False):
             else:
                 try:
                     if sum(im_labels[im_ref_buffer,0]) < 50:
-                        im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
                         contours_mwi, t_mndwi = find_wl_contours1(im_mndwi, cloud_mask, im_ref_buffer)
                     else:
                         contours_mwi, t_mndwi = find_wl_contours2(im_ms, im_labels, cloud_mask, im_ref_buffer)
@@ -181,13 +181,12 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 date = filenames[i][:19]
                 if not settings['check_detection']:
                     plt.ioff()
-                skip_image = show_detection(im_ms, cloud_mask, im_labels, shoreline,
+                skip_image = show_detection(im_ms, im_mndwi, cloud_mask, im_labels, shoreline,
                                             image_epsg, georef, settings, date, satname)
                 if skip_image:
                     continue
 
             # determine if transect origins are on land or water
-            if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
             if settings.get("plot_mndwi", False): plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
             on_water = get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
@@ -943,7 +942,7 @@ def process_shoreline(contours, cloud_mask, im_nodata, georef, image_epsg, setti
 # INTERACTIVE/PLOTTING FUNCTIONS
 ###################################################################################################
 
-def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
+def show_detection(im_ms, im_mwi, cloud_mask, im_labels, shoreline,image_epsg, georef,
                    settings, date, satname):
     """
     Shows the detected shoreline to the user for visual quality control. 
@@ -1007,9 +1006,6 @@ def show_detection(im_ms, cloud_mask, im_labels, shoreline,image_epsg, georef,
         im_class[im_labels[:,:,k],0] = colours[k,0]
         im_class[im_labels[:,:,k],1] = colours[k,1]
         im_class[im_labels[:,:,k],2] = colours[k,2]
-
-    # compute MNDWI grayscale image
-    im_mwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
 
     # transform world coordinates of shoreline into pixel coordinates
     # use try/except in case there are no coordinates to be transformed (shoreline = [])

@@ -298,7 +298,9 @@ def compute_intersection_QC(output, transects, settings):
     
     med_intersect[~idx_good] = np.nan
     n_cluster[~idx_good] = np.nan
-    nan_after = np.isnan(med_intersect)
+    # med_intersect[~idx_good] = min_intersect[~idx_good]
+    # med_intersect[~condition3] = np.nan
+
 
     # save intersections for each transect in dictionary
     cross_dist = {key: med_intersect[:,transect_idx] for transect_idx, key in enumerate(transects.keys())}
@@ -311,6 +313,7 @@ def compute_intersection_QC(output, transects, settings):
 
     # plot why intersections were rejected for each transect and shoreline
     if settings.get("plot_rejection_counts", False) and settings.get('cluster_intersection_selection', False):
+        nan_after = np.isnan(med_intersect)
         dispersion_rejections = np.logical_and(nan_after, ~nan_before)
         rejection_counts[dispersion_rejections] = 6
         plot_rejection_counts(rejection_counts, settings['output_dir'])
@@ -1037,7 +1040,7 @@ def identify_outliers(chainage, dates, cross_change, debug=False):
     return chainage_temp, dates_temp
 
 def plot_outlier_rejection(key, chainage1, chainage2, chainage3, dates1, dates2, dates3, plot_dir):
-    # only plot before
+    # # only plot before
     # fig, ax = plt.subplots(1, 1, figsize=(12, 3), tight_layout=True)
     # ax.grid(linestyle=':', color='0.5')
     # ax.set(ylabel='distance [m]',

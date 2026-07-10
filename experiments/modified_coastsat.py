@@ -1116,17 +1116,12 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             im_mndwi = None
             try:
-                # im_mndwi = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
-                # sds_data = {
-                #     "cloud_mask": cloud_mask,
-                #     "sl_buffer": im_ref_buffer
-                # }
-                # im_mndwi = su.spectral_unmixing_2(im_ms, im_ind, sds_data).reshape(cloud_mask.shape)
-                im_mndwi = indices.mndwi(im_ms.reshape(-1, im_ms.shape[-1])).reshape(im_ms.shape[:-1])
-                # im_mndwi = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer).reshape(im_ms.shape[:-1])
-                
-                # print(f"\nensemble2 nan count: {np.sum(np.isnan(im_ind))}")
-                # print(f"spectral unmixing nan count: {np.sum(np.isnan(im_mndwi))}")
+                im_ind = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
+                sds_data = {
+                    "cloud_mask": cloud_mask,
+                    "sl_buffer": im_ref_buffer
+                }
+                im_mndwi = su.spectral_unmixing_2(im_ms, im_ind, sds_data).reshape(cloud_mask.shape)
 
                 contours_mwi, t_mndwi = SDS_shoreline.find_wl_contours1(im_mndwi, cloud_mask, im_ref_buffer)
             except Exception as e:
