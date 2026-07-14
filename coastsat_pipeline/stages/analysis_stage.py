@@ -22,7 +22,6 @@ class AnalysisStage(PipelineStage):
             output,
             settings,
             params.transect_settings,
-            params.outlier_settings,
         )
 
         context.cross_distance = cross_distance

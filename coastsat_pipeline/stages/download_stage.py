@@ -8,7 +8,7 @@ from ..stage import PipelineStage
 from ..parameters import Parameters
 
 class DownloadStage(PipelineStage):
-    name = "Download"
+    name = "download"
     description = "Download imagery"
 
     def run(self, context: PipelineContext, params: Parameters) -> None:

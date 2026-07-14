@@ -24,6 +24,7 @@ class TimeSeriesPostProcessingStage(PipelineStage):
             global_settings=global_settings,
             cross_distance_tidally_corrected=corrected,
             output=output,
+            outlier_settings=params.outlier_settings,
             min_chainage_size=params.min_chainage_size,
             trend_plot_dir=params.alternate_trend_plot_dir,
         )

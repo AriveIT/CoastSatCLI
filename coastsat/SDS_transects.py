@@ -253,7 +253,7 @@ def compute_intersection_QC(output, transects, settings):
                 rejection_counts[sl_idx, transect_idx] = 7 # 7 means no intersections
                 continue
 
-            if settings.get('cluster_intersection_selection', False):
+            if settings.get('CASS', False):
                 if settings.get('cloud_filtering', True):
                     cloud_idx = sl_idx - trees_per_file * last_kd_tree_idx
                     cloud_min_max, cloud_points = get_cloud_min_max(transects[key], cloud_kd_trees[cloud_idx], query_radii[transect_idx],
@@ -261,7 +261,7 @@ def compute_intersection_QC(output, transects, settings):
                 else:
                     cloud_min_max, cloud_points = None, None
                 transect_classes = output['transect_origin_classes'][sl_idx][transect_idx]
-                clusters, centroids, c_idx, c_info = cluster_intersection_selection(
+                clusters, centroids, c_idx, c_info = CASS(
                     intersections = intersections[~np.isnan(intersections)],
                     clustering_threshold = settings['clustering_threshold'],
                     transect_classes = transect_classes,
@@ -306,13 +306,13 @@ def compute_intersection_QC(output, transects, settings):
     cross_dist = {key: med_intersect[:,transect_idx] for transect_idx, key in enumerate(transects.keys())}
     
     # plot time series with cluster information
-    if settings.get("plot_n_clusters", False) and settings.get('cluster_intersection_selection', False):
+    if settings.get("plot_n_clusters", False) and settings.get('CASS', False):
         for transect_idx, key in enumerate(transects.keys()):
             transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx,0]
             plot_n_clusters(cross_dist[key], output['dates'], n_cluster[:,transect_idx], transect_classes, key, settings['output_dir'])
 
     # plot why intersections were rejected for each transect and shoreline
-    if settings.get("plot_rejection_counts", False) and settings.get('cluster_intersection_selection', False):
+    if settings.get("plot_rejection_counts", False) and settings.get('CASS', False):
         nan_after = np.isnan(med_intersect)
         dispersion_rejections = np.logical_and(nan_after, ~nan_before)
         rejection_counts[dispersion_rejections] = 6
@@ -386,7 +386,7 @@ def update_ema(ema, alpha, new_value):
 
 
 ###################################################################################################
-# Cluster Intersection Selection Algorithm
+# Cloud-Aware Shoreline Selection (CASS)
 ###################################################################################################
 
 # given a set of intersections, apply 1d clustering, and select the cluster that corresponds to the correct
@@ -402,7 +402,7 @@ def update_ema(ema, alpha, new_value):
 # -3: cloud preferred over shoreline
 # -4: 2 clusters + cloud
 # -5: >2 clusters
-def cluster_intersection_selection(intersections, clustering_threshold, transect_classes, transect_length, cloud_min_max):
+def CASS(intersections, clustering_threshold, transect_classes, transect_length, cloud_min_max):
 
     # get clusters
     clusters = cluster1d(intersections, threshold=clustering_threshold)

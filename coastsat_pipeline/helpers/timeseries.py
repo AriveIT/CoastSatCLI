@@ -31,18 +31,22 @@ def run_time_series_post_processing(
     cross_distance_tidally_corrected: Dict[str, np.ndarray],
     output: Dict[str, Any],
     min_chainage_size: int,
+    outlier_settings: Dict[str, Any],
     trend_plot_dir: str | None, # alternate trend plot path
     options: TimeSeriesOptions | None = None,
 ) -> TimeSeriesResult:
     options = options or TimeSeriesOptions()
     (seasonal_path, monthly_path, ma_path) = _get_full_plot_path(trend_plot_dir, global_settings["sitename"], global_settings["filepath"])
-    cross_distance = {key: np.asarray(series, dtype=float).copy() for key, series in cross_distance_tidally_corrected.items()}
+    
+    outlier_settings["plot_dir"] = global_settings["filepath"]
+    cross_distance = SDS_transects.reject_outliers(cross_distance_tidally_corrected, output, outlier_settings)
+    cross_distance = {key: np.asarray(series, dtype=float).copy() for key, series in cross_distance.items()}
     dates = output["dates"]
 
     if options.write_csv:
         _write_time_series_csv(transects, cross_distance, dates, global_settings)
 
-    # Compute trends and plots. (Note: outliers have already been rejected in the analysis stage)
+    # Compute trends and plots
     trend_dict: Dict[str, float] = {}
     unexplained_var_dict: Dict[str, float] = {}
     trend_std_dict: Dict[str, float] = {}

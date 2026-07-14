@@ -21,7 +21,6 @@ def run_shoreline_analysis(
     output: Dict[str, Any],
     global_settings: Dict[str, Any],
     transect_settings: Dict[str, Any],
-    outlier_settings: Dict[str, Any],
     options: AnalysisOptions | None = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """
@@ -33,7 +32,7 @@ def run_shoreline_analysis(
     logger.info("Stage 03: analyzing shorelines for site %s", sitename)
 
     transects = SDS_tools.transects_from_geojson(global_settings["transect_geojson"])
-    cross_distance = _compute_cross_distance(output, transects, transect_settings, outlier_settings, global_settings["filepath"], sitename)
+    cross_distance = _compute_cross_distance(output, transects, transect_settings, global_settings["filepath"], sitename)
 
     if options.plot_transects:
         _plot_shorelines_with_transects(output, transects, global_settings)
@@ -52,15 +51,13 @@ def _compute_cross_distance(
         output: Dict[str, Any],
         transects: Dict[str, Any],
         transect_settings: Dict[str, Any],
-        outlier_settings: Dict[str, Any],
         output_dir: str,
         sitename: str
 ) -> Dict[str, Any]:
     transect_settings["output_dir"] = output_dir
     transect_settings["sitename"] = sitename
-    outlier_settings["plot_dir"] = output_dir
     cross_distance = SDS_transects.compute_intersection_QC(output, transects, transect_settings)
-    return SDS_transects.reject_outliers(cross_distance, output, outlier_settings)
+    return cross_distance
 
 
 def _plot_shorelines_with_transects(output: Dict[str, Any], transects: Dict[str, Any], global_settings: Dict[str, Any]) -> None:
