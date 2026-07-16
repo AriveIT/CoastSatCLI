@@ -13,6 +13,7 @@ from scipy.ndimage import median_filter
 import numpy as np
 from tqdm import tqdm
 from itertools import product
+import matplotlib.pyplot as plt
 
 def extract_shoreline(sim_bands, index_fn, thresh_fn, sds_data):
     im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
@@ -69,9 +70,13 @@ def evaluate_methods(
                 index = ensemble1(sim_bands, ensemble_index_functions, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
             elif index_fn == ensemble2:
                 index = ensemble2(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
-            elif index_fn == "spectral_unmixing":
+            elif index_fn == "spectral_unmixing_1":
                 im_ind = ensemble2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
                 index = su.spectral_unmixing_1(sim_bands, im_ind, sds_data)
+            elif index_fn == "spectral_unmixing_2":
+                im_ind = ensemble2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
+                index = su.spectral_unmixing_2(sim_bands, im_ind, sds_data)
+                index[index < 0.6] = np.nan
                 
             else:
                 index = index_fn(im_flat)
