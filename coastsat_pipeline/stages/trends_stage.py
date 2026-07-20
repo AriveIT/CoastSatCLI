@@ -36,6 +36,7 @@ class TrendCalculationStage(PipelineStage):
             unexplained_var_dict=unexplained_var_dict,
             trend_std_dict=trend_std_dict,
             trend_plot_dir=params.alternate_trend_plot_dir,
+            version=params.version
         )
 
         context.trend_results = trend_results

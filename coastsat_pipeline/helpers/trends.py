@@ -36,6 +36,7 @@ class TransectTrend:
     run_date: datetime
     analysis_date_range: str
     missions: str
+    version: float
 
 
 @dataclass
@@ -55,6 +56,7 @@ def save_trends(
     unexplained_var_dict: Dict[str, float],
     trend_std_dict: Dict[str, float],
     trend_plot_dir: str,
+    version: float,
 ) -> TrendExportResult:
     """
     Build per-transect trend summaries and export them as GeoJSON, mirroring the legacy Stage 08.
@@ -70,6 +72,7 @@ def save_trends(
         trend_std_dict=trend_std_dict,
         slope_est=slope_est,
         trend_plot_dir=trend_plot_dir,
+        version_number=version,
     )
     geojson_path = _export_trends_geojson(records, global_settings, trend_plot_dir)
 
@@ -90,6 +93,7 @@ def _build_transect_trends(
     trend_std_dict: Dict[str, float],
     slope_est: Dict[str, float],
     trend_plot_dir: str | None,
+    version_number: float
 ) -> List[TransectTrend]:
     total_images = len(output.get("dates", []))
     tide_stats = global_settings.get("tide_filter_stats", {})
@@ -127,6 +131,7 @@ def _build_transect_trends(
             run_date=str(datetime.datetime.now()),
             analysis_date_range=str(global_settings["dates"])[1:-1], # webmap tool doesn't like lists
             missions=str(global_settings["sat_list"])[1:-1],
+            version=version_number,
         )
         records.append(record)
 

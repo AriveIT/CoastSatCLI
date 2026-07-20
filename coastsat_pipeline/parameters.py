@@ -62,6 +62,7 @@ def print_options():
 
 @dataclass
 class Parameters:
+    version = 1.1
 
     apply_tide_correction = True # False means skip slope estimation and tide correction
     
