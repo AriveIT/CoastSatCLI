@@ -67,7 +67,7 @@ def ddwi(sample):
 ################
 # Ensemble
 ################
-def ensemble1(sim_bands, ensemble_index_functions, cloud_mask, sl_buffer):
+def ensemble1(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
     ensemble_index = np.zeros(sim_bands.shape[:-1])
     for ind_func in ensemble_index_functions:
         im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
@@ -76,8 +76,9 @@ def ensemble1(sim_bands, ensemble_index_functions, cloud_mask, sl_buffer):
         # standardize index values within buffer to [0, 1]
         vec = apply_buffer_and_mask(index_im, cloud_mask, sl_buffer)
         standardized_index_im = standardize(index_im, np.min(vec), np.max(vec))
+        centered_index_im = standardized_index_im - thresh_fn(standardized_index_im, cloud_mask, sl_buffer)
 
-        ensemble_index += standardized_index_im
+        ensemble_index += centered_index_im
 
     return ensemble_index / len(ensemble_index_functions)
 

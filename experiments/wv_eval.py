@@ -67,7 +67,7 @@ def evaluate_methods(
 
             # compute index
             if index_fn == ensemble1:
-                index = ensemble1(sim_bands, ensemble_index_functions, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
+                index = ensemble1(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
             elif index_fn == ensemble2:
                 index = ensemble2(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
             elif index_fn == "spectral_unmixing_1":
