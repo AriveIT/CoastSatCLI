@@ -140,6 +140,7 @@ class Parameters:
         "transects_to_plot": [], # plot all intersections for transects with these names
         "plot_entire_shoreline": True, # add plot to intersection images showing the entire shoreline to provide more context
         "plot_1d": True, # add plot to intersection images showing projected intersection points
+        "plot_sat": True, # add satellite image as basemap
 
         "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
         "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)

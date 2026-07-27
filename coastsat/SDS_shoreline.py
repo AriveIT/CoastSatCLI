@@ -79,6 +79,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
         output_t_mndwi = []
         output_transect_origin_classes = []
         output_cloud_kdtrees = []
+        output_im_data = []
 
         str_new = ''
         if not sklearn.__version__[:4] == '0.20':
@@ -204,9 +205,9 @@ def extract_shorelines(metadata, settings, print_errors=False):
             output_idxkeep.append(i)
             output_t_mndwi.append(t_mndwi)
             output_transect_origin_classes.append(on_water)
-            
-            # for cloud intersections
-            output_cloud_kdtrees.append(cloud_kdtree)
+            output_cloud_kdtrees.append(cloud_kdtree) # for cloud intersections
+            im_RGB = SDS_preprocess.rescale_image_intensity(im_ms[:,:,[2,1,0]], cloud_mask, 99.9)
+            output_im_data.append((im_RGB, georef, image_epsg)) # for plotting
 
         output[satname] = {
             'dates': output_timestamp,
@@ -218,6 +219,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
             'MNDWI_threshold': output_t_mndwi,
             'transect_origin_classes': output_transect_origin_classes,
             'cloud_kdtrees': output_cloud_kdtrees,
+            'im_data': output_im_data
         }
 
         print()
@@ -238,23 +240,25 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
     filepath = filepath_data
 
-    # save cloud kdtrees in multiple files so they can be loaded separately for better memory usage
-    save_cloud_kdtrees(output["cloud_kdtrees"], 50, filepath, sitename)
+    # save cloud kdtrees and rgb ims in multiple files so they can be loaded separately for better memory usage
+    save_objects(output["cloud_kdtrees"], 50, filepath, sitename, "kdtrees", "cloud_kdtrees")
     del(output["cloud_kdtrees"])
+    save_objects(output["im_data"], 50, filepath, sitename, "im_data", "im_data")
+    del(output["im_data"])
 
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)
 
     return output
 
-def save_cloud_kdtrees(kdtrees, trees_per_file, filepath, sitename):
+def save_objects(objects, objects_per_file, filepath, sitename, dir_name, object_name):
 
-    os.makedirs(os.path.join(filepath, "kdtrees"), exist_ok=True)
+    os.makedirs(os.path.join(filepath, dir_name), exist_ok=True)
 
-    for i in range(0, len(kdtrees), trees_per_file):
-        end = min(len(kdtrees), i+trees_per_file)
-        with open(os.path.join(filepath, "kdtrees", f'{sitename}_cloud_kdtrees_{i}_{end}.pkl'), 'wb') as f:
-            pickle.dump(kdtrees[i:end], f)
+    for i in range(0, len(objects), objects_per_file):
+        end = min(len(objects), i+objects_per_file)
+        with open(os.path.join(filepath, dir_name, f'{sitename}_{object_name}_{i}_{end}.pkl'), 'wb') as f:
+            pickle.dump(objects[i:end], f)
 
 def plot_cloud_masks(im_ms, cloud_mask, settings, date):
     fig, ax = plt.subplots(figsize=(12, 8), tight_layout=True)

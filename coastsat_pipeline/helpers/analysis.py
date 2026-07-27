@@ -32,6 +32,7 @@ def run_shoreline_analysis(
     logger.info("Stage 03: analyzing shorelines for site %s", sitename)
 
     transects = SDS_tools.transects_from_geojson(global_settings["transect_geojson"])
+    transect_settings["output_epsg"] = global_settings["output_epsg"]
     cross_distance = _compute_cross_distance(output, transects, transect_settings, global_settings["filepath"], sitename)
 
     if options.plot_transects:
