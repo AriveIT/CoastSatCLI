@@ -13,7 +13,7 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = False # plots all extracted shorelines in different colours
-    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
     skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
@@ -137,9 +137,9 @@ class Parameters:
         "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
         
         # clustering shoreline selection plotting
-        "transects_to_plot": [], # plot all intersections for transects with these names
-        "plot_entire_shoreline": True, # add plot to intersection images showing the entire shoreline to provide more context
-        "plot_1d": True, # add plot to intersection images showing projected intersection points
+        "transects_to_plot": ["transect_052"], # plot all intersections for transects with these names
+        "plot_entire_shoreline": False, # add plot to intersection images showing the entire shoreline to provide more context
+        "plot_1d": False, # add plot to intersection images showing projected intersection points
         "plot_sat": True, # add satellite image as basemap
 
         "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
