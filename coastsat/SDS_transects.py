@@ -243,7 +243,7 @@ def compute_intersection_QC(output, transects, settings):
     # loop through each shoreline
     n = len(shorelines)
     last_obj_idx = 0
-    cloud_kd_trees = load_objects(settings, last_obj_idx, objects_per_file, n, "kdtrees", "cloud_kdtrees")
+    if settings["cloud_filtering"]: cloud_kd_trees = load_objects(settings, last_obj_idx, objects_per_file, n, "kdtrees", "cloud_kdtrees")
     if settings["plot_sat"]: im_data = load_objects(settings, last_obj_idx, objects_per_file, n, "im_data", "im_data")
     for sl_idx in range(len(shorelines)):
         print(f'\rProcessing shoreline {sl_idx + 1} out of {str(n)}...', end='')
@@ -252,7 +252,7 @@ def compute_intersection_QC(output, transects, settings):
         # load next cloud kd tree file
         cur = sl_idx // objects_per_file
         if cur != last_obj_idx:
-            cloud_kd_trees = load_objects(settings, cur, objects_per_file, n, "kdtrees", "cloud_kdtrees")
+            if settings["cloud_filtering"]: cloud_kd_trees = load_objects(settings, cur, objects_per_file, n, "kdtrees", "cloud_kdtrees")
             if settings["plot_sat"]: im_data = load_objects(settings, cur, objects_per_file, n, "im_data", "im_data")
             last_obj_idx = cur
 

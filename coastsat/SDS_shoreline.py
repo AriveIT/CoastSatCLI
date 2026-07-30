@@ -192,10 +192,11 @@ def extract_shorelines(metadata, settings, print_errors=False):
             on_water = get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
             # build cloud mask kd tree
-            cloud_idx = np.column_stack(np.where(cloud_mask))
-            cloud_coords = SDS_tools.convert_pix2world(cloud_idx, georef)
-            cloud_coords = SDS_tools.convert_epsg(cloud_coords, image_epsg, settings['output_epsg'])
-            cloud_kdtree = cKDTree(cloud_coords)
+            if settings["save_cloud_kdtrees"]: 
+                cloud_idx = np.column_stack(np.where(cloud_mask))
+                cloud_coords = SDS_tools.convert_pix2world(cloud_idx, georef)
+                cloud_coords = SDS_tools.convert_epsg(cloud_coords, image_epsg, settings['output_epsg'])
+                cloud_kdtree = cKDTree(cloud_coords)
 
             output_timestamp.append(metadata[satname]['dates'][i])
             output_shoreline.append(shoreline)
@@ -205,9 +206,10 @@ def extract_shorelines(metadata, settings, print_errors=False):
             output_idxkeep.append(i)
             output_t_mndwi.append(t_mndwi)
             output_transect_origin_classes.append(on_water)
-            output_cloud_kdtrees.append(cloud_kdtree) # for cloud intersections
-            im_RGB = SDS_preprocess.rescale_image_intensity(im_ms[:,:,[2,1,0]], cloud_mask, 99.9)
-            output_im_data.append((im_RGB, georef, image_epsg)) # for plotting
+            if settings["save_cloud_kdtrees"]: output_cloud_kdtrees.append(cloud_kdtree) # for cloud intersections
+            if settings["save_sat_rgb"]:
+                im_RGB = SDS_preprocess.rescale_image_intensity(im_ms[:,:,[2,1,0]], cloud_mask, 99.9)
+                output_im_data.append((im_RGB, georef, image_epsg)) # for plotting
 
         output[satname] = {
             'dates': output_timestamp,
@@ -218,9 +220,9 @@ def extract_shorelines(metadata, settings, print_errors=False):
             'idx': output_idxkeep,
             'MNDWI_threshold': output_t_mndwi,
             'transect_origin_classes': output_transect_origin_classes,
-            'cloud_kdtrees': output_cloud_kdtrees,
-            'im_data': output_im_data
         }
+        if settings["save_cloud_kdtrees"]: output[satname]["cloud_kdtrees"] = output_cloud_kdtrees
+        if settings["save_sat_rgb"]: output[satname]["im_data"] = output_im_data
 
         print()
         print(f"    {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
@@ -241,10 +243,12 @@ def extract_shorelines(metadata, settings, print_errors=False):
     filepath = filepath_data
 
     # save cloud kdtrees and rgb ims in multiple files so they can be loaded separately for better memory usage
-    save_objects(output["cloud_kdtrees"], 50, filepath, sitename, "kdtrees", "cloud_kdtrees")
-    del(output["cloud_kdtrees"])
-    save_objects(output["im_data"], 50, filepath, sitename, "im_data", "im_data")
-    del(output["im_data"])
+    if settings["save_cloud_kdtrees"]:
+        save_objects(output["cloud_kdtrees"], 50, filepath, sitename, "kdtrees", "cloud_kdtrees")
+        del(output["cloud_kdtrees"])
+    if settings["save_sat_rgb"]:
+        save_objects(output["im_data"], 50, filepath, sitename, "im_data", "im_data")
+        del(output["im_data"])
 
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)

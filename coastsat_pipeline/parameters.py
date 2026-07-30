@@ -13,7 +13,7 @@ import pytz
 class ImageryOptions:
     save_geojson: bool = False # save extracted shorelines to geojson
     save_plots: bool = False # plots all extracted shorelines in different colours
-    cache_enabled: bool = True # Try loading <sitename>_output.pkl file to skip shoreline extraction
+    cache_enabled: bool = False # Try loading <sitename>_output.pkl file to skip shoreline extraction
     skip_existing_jpg: bool = False # skip creating jpg that already exist (I don't think this is working)
     capture_skipped_jpgs: bool = False # save skipped jpg for debugging
     skip_jpg: bool = True # skip saving jpg altogether (saving jpg is not necessary for analysis)
@@ -114,6 +114,10 @@ class Parameters:
         "plot_mndwi": False, # plot histograms of MNDWI values for each image
         "save_detection_plots": True, # plot RGB, pixel classification, MNDWI, and extracted shoreline
         "plot_cloud_cover": True, # plot histogram of cloud cover percentages of each image
+
+        # saving pkl files (coordinate with transect_settings)
+        "save_cloud_kdtrees": True, # must be True if cloud_filtering
+        "save_sat_rgb": False, # must be True if plot_sat
     }
 
     #####################
@@ -140,7 +144,7 @@ class Parameters:
         "transects_to_plot": ["transect_052"], # plot all intersections for transects with these names
         "plot_entire_shoreline": False, # add plot to intersection images showing the entire shoreline to provide more context
         "plot_1d": False, # add plot to intersection images showing projected intersection points
-        "plot_sat": True, # add satellite image as basemap
+        "plot_sat": False, # add satellite image as basemap
 
         "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
         "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)
