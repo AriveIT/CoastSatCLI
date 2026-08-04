@@ -38,7 +38,7 @@ from datetime import datetime, timedelta
 from pylab import ginput
 
 # CoastSat modules
-from coastsat import SDS_tools, SDS_preprocess
+from coastsat import SDS_tools, SDS_preprocess, CASS
 
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
 # Main function for batch shoreline detection
@@ -189,7 +189,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             # determine if transect origins are on land or water
             if settings.get("plot_mndwi", False): plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
-            on_water = get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
+            on_water = CASS.get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
 
             # build cloud mask kd tree
             if settings["save_cloud_kdtrees"]: 
@@ -323,45 +323,7 @@ def plot_cloud_cover_hist(cloud_covers, settings):
     fig.savefig(output_path, dpi=300)
     plt.close(fig)
 
-def get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filename, image_epsg):
-    origins = transects[:,0,:]
-    endpoints = transects[:,-1,:]
-    midpoints = (origins + endpoints) / 2
-    points_world = np.concatenate([origins, midpoints, endpoints])
 
-    points_pxl = np.round(SDS_tools.convert_world2pix(SDS_tools.convert_epsg(points_world,
-                                                                    settings['output_epsg'],
-                                                                    image_epsg), georef)).astype(int)
-
-    # filter out indices outside of image
-    inside_x = (points_pxl[:, 1] < im_mndwi.shape[0]) & (points_pxl[:, 1] >= 0)
-    inside_y = (points_pxl[:, 0] < im_mndwi.shape[1]) & (points_pxl[:, 0] >= 0)
-    inside = inside_x & inside_y
-
-    # if transect is inside image, check if on cloud pixel. Otherwise set to False
-    # cloud_mask is True where a cloud is. Therefore valid should be True if cloud_mask is False
-    valid = np.full(inside.shape, False)
-    valid[inside] = ~cloud_mask[points_pxl[inside, 1], points_pxl[inside, 0]]
-  
-    # value < t_mndwi means water
-    on_water = np.full(inside.shape, -1)
-    on_water[valid] = (im_mndwi[points_pxl[valid,1], points_pxl[valid,0]] < t_mndwi).astype(int)
-
-    # plot_classified_transect_origins(points_pxl, on_water, im_mndwi, filename)
-    return on_water.reshape((-1,3), order='F') # want each row to correspond to a single transect
- 
-
-def plot_classified_transect_origins(points_pxl, on_water, im, filename): 
-    colors = ["blue" if w==1 else "green" if w==0 else "gray" for w in on_water]
-
-    fig, ax = plt.subplots()
-    ax.imshow(im)
-    
-    ax.scatter(points_pxl[:,0], points_pxl[:,1], c=colors, s=0.1)
-
-    dir = "C:\\Users\\avanever\\Documents\\CoastSatProject\\Plots"
-    fig.savefig(f"{dir}\\{filename}_mndwi.png", dpi=400)
-    plt.close(fig)
 
 
 ###################################################################################################
