@@ -288,7 +288,7 @@ def compute_intersection_QC(output, transects, settings):
                 )
 
                 # plot intersections and other clustering alg related info
-                if key in settings.get('transects_to_plot', []) and c_info > 0:
+                if key in settings.get('transects_to_plot', []): # and c_info > 0:
                     plot_clustering_intersections(intersections, key, sl, transects[key], transect_classes,
                             centroids, c_idx, c_info, cloud_min_max, cloud_points, str(output['dates'][sl_idx])[:10], settings, im_datum)
 
@@ -413,21 +413,18 @@ def update_ema(ema, alpha, new_value):
 # assumes intersections is not empty
 
 # returns clusters, centroids, index of selected centroid (-1 if no selection), info
+# info gives the reason why the intersection was rejected, or the utilised label otherwise
 def CASS(intersections, clustering_threshold, transect_classes, transect_length, cloud_min_max):
 
     # get clusters
     clusters = cluster1d(intersections, threshold=clustering_threshold)
     centroids = np.array([np.mean(c) for c in clusters])
 
-    # select label if we will have to select a centroid
-    if (cloud_min_max is not None) + len(clusters) >= 2:
-        label_idx, offset = select_label(centroids, transect_classes, transect_length)
-        if label_idx == -1:
-            return None, None, -1, -INVALID_LABELS
-        transect_class = transect_classes[label_idx]
-    # label_idx = 0
-    # offset = 0
-    # transect_class = transect_classes[0]
+    # select label
+    label_idx, offset = select_label(centroids, transect_classes, transect_length)
+    if label_idx == -1:
+        return None, None, -1, -INVALID_LABELS
+    transect_class = transect_classes[label_idx]
 
     if cloud_min_max:
         
@@ -466,7 +463,10 @@ def CASS(intersections, clustering_threshold, transect_classes, transect_length,
     else:
 
         if len(clusters) == 1:
-            return clusters, centroids, 0, 1
+            if select_centroid_1(centroids[0] - offset, transect_class):
+                return clusters, centroids, 0, label_idx + 1
+            else:
+                return clusters, centroids, -1, -CLOUD_PREFERRED
         
         if len(clusters) == 2:
             centroid_idx = select_centroid_2(centroids - offset, transect_class)
@@ -494,10 +494,13 @@ def select_label(centroids, transect_classes, transect_length):
     clf_points = np.array([0, transect_length / 2, transect_length])
     for i in range(3):
         if transect_classes[i] != -1 and np.all(np.abs(clf_points[i] - centroids) > 15):
-            return i, transect_length * i / 2
+            return i, clf_points[i]
 
     return -1, 0
 
+# returns true if the one shoreline is facing the right direction
+def select_centroid_1(centroid, transect_class):
+    return (transect_class and centroid < 0) or (not transect_class and centroid > 0)
 
 # transect_class = 1 --> transect origin is on water
 # assumes exactly 2 centroids, and transect classes are valid (0 or 1)
