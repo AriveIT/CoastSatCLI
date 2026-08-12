@@ -212,18 +212,14 @@ def compute_intersection_QC(output, transects, settings):
             corrected.
         
     """
+    ts = np.array(list(transects.values()))
+    transect_cache = {} # stores transects converted to pixel spaces
     shorelines = output['shorelines']
     sl_norms = output['shoreline_norms']
     objects_per_file = 50
 
-    intersection_time = 0
-    selection_time = 0
-    
-    # pre-calculate values for cloud intersections
-    ts = np.array(list(transects.values()))
-    transect_lengths = np.linalg.norm(ts[:,-1,:] - ts[:,0,:], axis=1)
-    half_collider_lengths = (transect_lengths + settings["past_dist"] - settings["min_chainage"]) / 2
-    query_radii = np.sqrt(half_collider_lengths ** 2 + settings["along_dist"] ** 2) # distance from collider center to collider corner
+    conversion_time = 0
+ 
 
     # initialise variables
     def init_var():
@@ -254,33 +250,41 @@ def compute_intersection_QC(output, transects, settings):
             if settings["plot_sat"]: im_data = load_objects(settings, cur, objects_per_file, n, "im_data", "im_data")
             last_obj_idx = cur
 
+        if settings.get('CASS', False):
+            obj_idx = sl_idx - objects_per_file * last_obj_idx
+            if settings.get('plot_sat', False):
+                im_datum = im_data[obj_idx]
+            else:
+                im_datum = None
+
+            start_time = timeit.default_timer()
+            cache_key = (tuple(np.round(im_datum[1], 6)), tuple(im_datum[2]))
+            if cache_key in transect_cache.keys():
+                pix_transects = transect_cache[cache_key]
+            else:
+                transects_0_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,0,:], settings["output_epsg"], im_datum[2]), im_datum[1])
+                transects_1_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,1,:], settings["output_epsg"], im_datum[2]), im_datum[1])
+                pix_transects = np.swapaxes(np.stack([transects_0_pxl, transects_1_pxl]), 0, 1)
+                transect_cache[cache_key] = pix_transects
+            conversion_time += timeit.default_timer() - start_time
+
         # loop through each transect
         for transect_idx, key in enumerate(transects.keys()):
 
-            start_time = timeit.default_timer()
             intersections, normals, intersecting_sl = CASS_V2.get_intersections(transects[key], sl, sl_norm, settings)
-            intersection_time += timeit.default_timer() - start_time
 
             if intersections is None:
                 rejection_counts[sl_idx, transect_idx] = CASS_V2.NO_INTERSECTIONS
                 continue
 
             if settings.get('CASS', False):
-                obj_idx = sl_idx - objects_per_file * last_obj_idx
-                if settings.get('plot_sat', False):
-                    im_datum = im_data[obj_idx]
-                else:
-                    im_datum = None
 
-                pix_transect = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(transects[key], settings["output_epsg"], im_datum[2]), im_datum[1])
-                start_time = timeit.default_timer()
                 intersections, dotprods, info = CASS_V2.shoreline_selection(
                     intersections,
                     normals,
-                    pix_transect,
+                    pix_transects[transect_idx],
                     settings['clustering_threshold']
                 )
-                selection_time += timeit.default_timer() - start_time
 
                 if intersections is None:
                     rejection_counts[sl_idx, transect_idx] = info
@@ -326,8 +330,7 @@ def compute_intersection_QC(output, transects, settings):
         rejection_counts[dispersion_rejections] = CASS_V2.DISPERSION
         CASS_V2.plot_rejection_counts(rejection_counts, settings['output_dir'])
 
-    print(f"{intersection_time = }")
-    print(f"{selection_time = }")
+    print(f"{conversion_time = }")
 
     print()
     return cross_dist

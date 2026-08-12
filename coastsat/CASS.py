@@ -218,6 +218,11 @@ def get_intersections(transect, sl, settings):
 
     return xy_rot[0,:]
 
+def get_query_radii(transects, settings):
+    transect_lengths = np.linalg.norm(transects[:,-1,:] - transects[:,0,:], axis=1)
+    half_collider_lengths = (transect_lengths + settings["past_dist"] - settings["min_chainage"]) / 2
+    return np.sqrt(half_collider_lengths ** 2 + settings["along_dist"] ** 2) # distance from collider center to collider corner
+
 ###################################################################################################
 # Shoreline Extraction
 ###################################################################################################
