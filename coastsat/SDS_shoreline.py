@@ -38,7 +38,7 @@ from datetime import datetime, timedelta
 from pylab import ginput
 
 # CoastSat modules
-from coastsat import SDS_tools, SDS_preprocess, CASS
+from coastsat import SDS_tools, SDS_preprocess, CASS, CASS_V2
 
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
 # Main function for batch shoreline detection
@@ -72,6 +72,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
         output_timestamp = []
         output_shoreline = []
+        output_shoreline_norms = []
         output_filename = []
         output_cloudcover = []
         output_geoaccuracy = []
@@ -175,8 +176,11 @@ def extract_shorelines(metadata, settings, print_errors=False):
                     error_skipped += 1
                     continue
 
-            shoreline = process_shoreline(contours_mwi, cloud_mask_adv, im_nodata,
-                                          georef, image_epsg, settings)
+            norms = CASS_V2.calc_shoreline_normals(contours_mwi)
+            # CASS_V2.plot_normals(contours_mwi, norms, filenames[i][:19]+"before")
+
+            shoreline, norms = CASS_V2.process_shoreline(contours_mwi, norms, cloud_mask_adv, im_nodata,
+                                          georef, image_epsg, settings, filenames[i][:19])
 
             if settings['check_detection'] or settings['save_detection_plots']:
                 date = filenames[i][:19]
@@ -200,6 +204,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             output_timestamp.append(metadata[satname]['dates'][i])
             output_shoreline.append(shoreline)
+            output_shoreline_norms.append(norms)
             output_filename.append(filenames[i])
             output_cloudcover.append(cloud_cover)
             output_geoaccuracy.append(metadata[satname]['acc_georef'][i])
@@ -214,6 +219,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
         output[satname] = {
             'dates': output_timestamp,
             'shorelines': output_shoreline,
+            'shoreline_norms': output_shoreline_norms,
             'filename': output_filename,
             'cloud_cover': output_cloudcover,
             'geoaccuracy': output_geoaccuracy,

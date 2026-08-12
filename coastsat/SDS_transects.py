@@ -16,6 +16,7 @@ import pytz
 import pdb
 import pickle
 from pathlib import Path
+import timeit
 
 # other modules
 import skimage.transform as transform
@@ -24,7 +25,7 @@ from scipy import stats
 from scipy.spatial import cKDTree
 
 # CoastSat modules
-from coastsat import SDS_tools, CASS
+from coastsat import SDS_tools, CASS, CASS_V2
 
 # Global variables
 DAYS_IN_YEAR = 365.2425
@@ -212,7 +213,11 @@ def compute_intersection_QC(output, transects, settings):
         
     """
     shorelines = output['shorelines']
+    sl_norms = output['shoreline_norms']
     objects_per_file = 50
+
+    intersection_time = 0
+    selection_time = 0
     
     # pre-calculate values for cloud intersections
     ts = np.array(list(transects.values()))
@@ -240,6 +245,7 @@ def compute_intersection_QC(output, transects, settings):
     for sl_idx in range(len(shorelines)):
         print(f'\rProcessing shoreline {sl_idx + 1} out of {str(n)}...', end='')
         sl = shorelines[sl_idx]
+        sl_norm = sl_norms[sl_idx]
 
         # load next cloud kd tree file
         cur = sl_idx // objects_per_file
@@ -250,47 +256,39 @@ def compute_intersection_QC(output, transects, settings):
 
         # loop through each transect
         for transect_idx, key in enumerate(transects.keys()):
-            
-            intersections = CASS.get_intersections(transects[key], sl, settings)
+
+            start_time = timeit.default_timer()
+            intersections, normals, intersecting_sl = CASS_V2.get_intersections(transects[key], sl, sl_norm, settings)
+            intersection_time += timeit.default_timer() - start_time
 
             if intersections is None:
-                rejection_counts[sl_idx, transect_idx] = CASS.NO_INTERSECTIONS
+                rejection_counts[sl_idx, transect_idx] = CASS_V2.NO_INTERSECTIONS
                 continue
 
             if settings.get('CASS', False):
                 obj_idx = sl_idx - objects_per_file * last_obj_idx
-                if settings.get('cloud_filtering', True):
-                    cloud_min_max, cloud_points = CASS.get_cloud_min_max(transects[key], cloud_kd_trees[obj_idx], query_radii[transect_idx],
-                                                                    half_collider_lengths[transect_idx], settings)
-                else:
-                    cloud_min_max, cloud_points = None, None
-
                 if settings.get('plot_sat', False):
                     im_datum = im_data[obj_idx]
                 else:
                     im_datum = None
 
-                transect_classes = output['transect_origin_classes'][sl_idx][transect_idx]
-                clusters, centroids, c_idx, c_info = CASS.shoreline_selection(
-                    intersections = intersections[~np.isnan(intersections)],
-                    clustering_threshold = settings['clustering_threshold'],
-                    transect_classes = transect_classes,
-                    transect_length = transect_lengths[transect_idx],
-                    cloud_min_max = cloud_min_max
+                pix_transect = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(transects[key], settings["output_epsg"], im_datum[2]), im_datum[1])
+                start_time = timeit.default_timer()
+                intersections, dotprods, info = CASS_V2.shoreline_selection(
+                    intersections,
+                    normals,
+                    pix_transect,
+                    settings['clustering_threshold']
                 )
+                selection_time += timeit.default_timer() - start_time
+
+                if intersections is None:
+                    rejection_counts[sl_idx, transect_idx] = info
+                    continue
 
                 # plot intersections and other clustering alg related info
                 if key in settings.get('transects_to_plot', []): # and c_info > 0:
-                    CASS.plot_clustering_intersections(intersections, key, sl, transects[key], transect_classes,
-                            centroids, c_idx, c_info, cloud_min_max, cloud_points, str(output['dates'][sl_idx])[:10], settings, im_datum)
-
-                # if no cluster selected
-                if c_info < 0:
-                    rejection_counts[sl_idx, transect_idx] = abs(c_info)
-                    continue
-                
-                intersections = clusters[c_idx] # update intersections to just selected cluster
-                n_cluster[sl_idx, transect_idx] = len(clusters)
+                    CASS_V2.plot_intersections(key, sl, intersecting_sl, normals, dotprods, transects[key], str(output['dates'][sl_idx])[:10], settings, im_datum)
 
             # compute std, median, max, min of the intersections (for current transect-shoreline pair)
             std_intersect[sl_idx, transect_idx] = np.nanstd(intersections)
@@ -325,8 +323,11 @@ def compute_intersection_QC(output, transects, settings):
     if settings.get("plot_rejection_counts", False) and settings.get('CASS', False):
         nan_after = np.isnan(med_intersect)
         dispersion_rejections = np.logical_and(nan_after, ~nan_before)
-        rejection_counts[dispersion_rejections] = CASS.DISPERSION
-        CASS.plot_rejection_counts(rejection_counts, settings['output_dir'])
+        rejection_counts[dispersion_rejections] = CASS_V2.DISPERSION
+        CASS_V2.plot_rejection_counts(rejection_counts, settings['output_dir'])
+
+    print(f"{intersection_time = }")
+    print(f"{selection_time = }")
 
     print()
     return cross_dist

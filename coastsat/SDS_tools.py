@@ -110,11 +110,11 @@ def convert_world2pix(points, georef):
         points_converted = []
         # iterate over the list
         for i, arr in enumerate(points): 
-            points_converted.append(tform.inverse(points))
+            points_converted.append(tform.inverse(arr)[:,[1,0]])
             
     # if single array    
     elif type(points) is np.ndarray:
-        points_converted = tform.inverse(points)
+        points_converted = tform.inverse(points)[:,[1,0]]
         
     else:
         print('invalid input type')
