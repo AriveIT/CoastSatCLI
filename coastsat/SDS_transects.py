@@ -216,10 +216,7 @@ def compute_intersection_QC(output, transects, settings):
     transect_cache = {} # stores transects converted to pixel spaces
     shorelines = output['shorelines']
     sl_norms = output['shoreline_norms']
-    objects_per_file = 50
-
-    conversion_time = 0
- 
+    objects_per_file = 50 
 
     # initialise variables
     def init_var():
@@ -230,13 +227,11 @@ def compute_intersection_QC(output, transects, settings):
     min_intersect = init_var()
     n_intersect = init_var()
 
-    n_cluster = init_var()
     rejection_counts = init_var()
 
     # loop through each shoreline
     n = len(shorelines)
     last_obj_idx = 0
-    if settings["cloud_filtering"]: cloud_kd_trees = load_objects(settings, last_obj_idx, objects_per_file, n, "kdtrees", "cloud_kdtrees")
     if settings["plot_sat"]: im_data = load_objects(settings, last_obj_idx, objects_per_file, n, "im_data", "im_data")
     for sl_idx in range(len(shorelines)):
         print(f'\rProcessing shoreline {sl_idx + 1} out of {str(n)}...', end='')
@@ -246,7 +241,6 @@ def compute_intersection_QC(output, transects, settings):
         # load next cloud kd tree file
         cur = sl_idx // objects_per_file
         if cur != last_obj_idx:
-            if settings["cloud_filtering"]: cloud_kd_trees = load_objects(settings, cur, objects_per_file, n, "kdtrees", "cloud_kdtrees")
             if settings["plot_sat"]: im_data = load_objects(settings, cur, objects_per_file, n, "im_data", "im_data")
             last_obj_idx = cur
 
@@ -257,7 +251,6 @@ def compute_intersection_QC(output, transects, settings):
             else:
                 im_datum = None
 
-            start_time = timeit.default_timer()
             cache_key = (tuple(np.round(im_datum[1], 6)), tuple(im_datum[2]))
             if cache_key in transect_cache.keys():
                 pix_transects = transect_cache[cache_key]
@@ -266,7 +259,6 @@ def compute_intersection_QC(output, transects, settings):
                 transects_1_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,1,:], settings["output_epsg"], im_datum[2]), im_datum[1])
                 pix_transects = np.swapaxes(np.stack([transects_0_pxl, transects_1_pxl]), 0, 1)
                 transect_cache[cache_key] = pix_transects
-            conversion_time += timeit.default_timer() - start_time
 
         # loop through each transect
         for transect_idx, key in enumerate(transects.keys()):
@@ -309,7 +301,6 @@ def compute_intersection_QC(output, transects, settings):
     idx_good = np.logical_and(np.logical_and(condition1, condition2), condition3)
     
     med_intersect[~idx_good] = np.nan
-    n_cluster[~idx_good] = np.nan
     # med_intersect[~idx_good] = min_intersect[~idx_good]
     # med_intersect[~condition3] = np.nan
 
@@ -317,20 +308,12 @@ def compute_intersection_QC(output, transects, settings):
     # save intersections for each transect in dictionary
     cross_dist = {key: med_intersect[:,transect_idx] for transect_idx, key in enumerate(transects.keys())}
     
-    # plot time series with cluster information
-    if settings.get("plot_n_clusters", False) and settings.get('CASS', False):
-        for transect_idx, key in enumerate(transects.keys()):
-            transect_classes = np.array(output['transect_origin_classes'])[:,transect_idx,0]
-            CASS.plot_n_clusters(cross_dist[key], output['dates'], n_cluster[:,transect_idx], transect_classes, key, settings['output_dir'])
-
     # plot why intersections were rejected for each transect and shoreline
     if settings.get("plot_rejection_counts", False) and settings.get('CASS', False):
         nan_after = np.isnan(med_intersect)
         dispersion_rejections = np.logical_and(nan_after, ~nan_before)
         rejection_counts[dispersion_rejections] = CASS_V2.DISPERSION
         CASS_V2.plot_rejection_counts(rejection_counts, settings['output_dir'])
-
-    print(f"{conversion_time = }")
 
     print()
     return cross_dist
