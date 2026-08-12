@@ -220,16 +220,18 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
     plt.close(fig)
 
 def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, transect_p0, transect_p1, collider, im_datum, im_rgb, col):
-    if im_rgb is not None:
-        georef, image_epsg = im_datum
-        def conv(points):
-            return SDS_tools.convert_world2pix(SDS_tools.convert_epsg(points, output_epsg, image_epsg), georef)
-        transect_p0, transect_p1 = conv(np.stack([transect_p0, transect_p1]))
-        collider = conv(np.stack(collider, axis=1)).T
-        int_sl = conv(int_sl)
-        sl = conv(sl)
+    georef, image_epsg = im_datum
 
+    # convert to image space to be consistent with norms
+    def conv(points):
+        return SDS_tools.convert_world2pix(SDS_tools.convert_epsg(points, output_epsg, image_epsg), georef)
+    transect_p0, transect_p1 = conv(np.stack([transect_p0, transect_p1]))
+    collider = conv(np.stack(collider, axis=1)).T
+    int_sl = conv(int_sl)
+    sl = conv(sl)
+    if im_rgb is not None:
         ax.imshow(im_rgb)
+
 
     cmap = plt.get_cmap('coolwarm')
 
@@ -253,8 +255,8 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
     ax.set_xlim(x_lim[0], x_lim[1])
     ax.set_ylim(y_lim[0], y_lim[1])
     ax.set_aspect('equal', adjustable='box')
-    # ax.get_xaxis().set_visible(False)
-    # ax.get_yaxis().set_visible(False)
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
     if im_datum is not None: ax.invert_yaxis()
 
     return sc

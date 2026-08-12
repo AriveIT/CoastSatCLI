@@ -141,8 +141,8 @@ class Parameters:
         
         # clustering shoreline selection plotting
         "transects_to_plot": [], # plot all intersections for transects with these names
-        "plot_entire_shoreline": False, # add plot to intersection images showing the entire shoreline to provide more context (not implemented)
-        "plot_1d": False, # add plot to intersection images showing projected intersection points (not implemented)
+        "plot_entire_shoreline": False, # add plot showing the entire shoreline (not implemented for CASS_V2)
+        "plot_1d": False, # add plot showing projected intersection points (not implemented for CASS_V2)
         "plot_sat": False, # add satellite image as basemap
 
         "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
