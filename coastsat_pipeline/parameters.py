@@ -137,13 +137,12 @@ class Parameters:
 
         # clustering shoreline selection settings
         "CASS": True, # use clustering intersection algorithm
-        "clustering_threshold": 20, # minimum gap between consecutive intersections needed to start new cluster
-        "cloud_filtering": True, # throw away points when a cloud might be covering the correct shoreline
+        "clustering_threshold": 20, # minimum gap between adjacent intersections needed to start new cluster
         
         # clustering shoreline selection plotting
-        "transects_to_plot": ["transect_052"], # plot all intersections for transects with these names
-        "plot_entire_shoreline": False, # add plot to intersection images showing the entire shoreline to provide more context
-        "plot_1d": False, # add plot to intersection images showing projected intersection points
+        "transects_to_plot": [], # plot all intersections for transects with these names
+        "plot_entire_shoreline": False, # add plot to intersection images showing the entire shoreline to provide more context (not implemented)
+        "plot_1d": False, # add plot to intersection images showing projected intersection points (not implemented)
         "plot_sat": False, # add satellite image as basemap
 
         "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect

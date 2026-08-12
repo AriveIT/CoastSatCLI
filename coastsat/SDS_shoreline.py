@@ -79,6 +79,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
         output_idxkeep = []
         output_t_mndwi = []
         output_im_data = []
+        output_im_rgb = []
 
         str_new = ''
         if not sklearn.__version__[:4] == '0.20':
@@ -200,9 +201,10 @@ def extract_shorelines(metadata, settings, print_errors=False):
             output_geoaccuracy.append(metadata[satname]['acc_georef'][i])
             output_idxkeep.append(i)
             output_t_mndwi.append(t_mndwi)
+            output_im_data.append((georef, image_epsg))
             if settings["save_sat_rgb"]:
                 im_RGB = SDS_preprocess.rescale_image_intensity(im_ms[:,:,[2,1,0]], cloud_mask, 99.9)
-                output_im_data.append((im_RGB, georef, image_epsg)) # for plotting
+                output_im_rgb.append(im_RGB) # for plotting
 
         output[satname] = {
             'dates': output_timestamp,
@@ -213,8 +215,9 @@ def extract_shorelines(metadata, settings, print_errors=False):
             'geoaccuracy': output_geoaccuracy,
             'idx': output_idxkeep,
             'MNDWI_threshold': output_t_mndwi,
+            'im_data': output_im_data
         }
-        if settings["save_sat_rgb"]: output[satname]["im_data"] = output_im_data
+        if settings["save_sat_rgb"]: output[satname]["im_rgb"] = output_im_rgb
 
         print()
         print(f"    {len(output_timestamp)} shorelines extracted, {cloud_skipped} skipped due to cloud cover, "
@@ -234,13 +237,10 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
     filepath = filepath_data
 
-    # save cloud kdtrees and rgb ims in multiple files so they can be loaded separately for better memory usage
-    if settings["save_cloud_kdtrees"]:
-        save_objects(output["cloud_kdtrees"], 50, filepath, sitename, "kdtrees", "cloud_kdtrees")
-        del(output["cloud_kdtrees"])
+    # save rgb ims in multiple files so they can be loaded separately for better memory usage
     if settings["save_sat_rgb"]:
-        save_objects(output["im_data"], 50, filepath, sitename, "im_data", "im_data")
-        del(output["im_data"])
+        save_objects(output["im_rgb"], 50, filepath, sitename, "im_rgb", "im_rgb")
+        del(output["im_rgb"])
 
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)

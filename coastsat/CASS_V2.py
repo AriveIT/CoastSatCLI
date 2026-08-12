@@ -185,7 +185,7 @@ def process_shoreline(contours, normals, cloud_mask, im_nodata, georef, image_ep
 # Plotting
 #############################################################################
 
-def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, date, settings, im_datum):
+def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, date, settings, im_datum, im_rgb):
     col = {
         "sl": "black",
         "transect": "tab:red",
@@ -201,7 +201,8 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
     # init plots
     fig, ax = plt.subplots(figsize=(12, 8))
 
-    sc = plot_basic_intersections(ax, sl, intersecting_sl, sl_norms, dotprods, settings["output_epsg"], transect_p0, transect_p1, collider, im_datum, col)
+    sc = plot_basic_intersections(ax, sl, intersecting_sl, sl_norms, dotprods, settings["output_epsg"],
+                                  transect_p0, transect_p1, collider, im_datum, im_rgb, col)
 
     # finalize plot
     leg_ax = ax
@@ -218,9 +219,9 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
     fig.savefig(f"{filepath}\\{key}_{date}.png")
     plt.close(fig)
 
-def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, transect_p0, transect_p1, collider, im_datum, col):
-    if im_datum is not None:
-        im_rgb, georef, image_epsg = im_datum
+def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, transect_p0, transect_p1, collider, im_datum, im_rgb, col):
+    if im_rgb is not None:
+        georef, image_epsg = im_datum
         def conv(points):
             return SDS_tools.convert_world2pix(SDS_tools.convert_epsg(points, output_epsg, image_epsg), georef)
         transect_p0, transect_p1 = conv(np.stack([transect_p0, transect_p1]))

@@ -216,6 +216,7 @@ def compute_intersection_QC(output, transects, settings):
     transect_cache = {} # stores transects converted to pixel spaces
     shorelines = output['shorelines']
     sl_norms = output['shoreline_norms']
+    im_data = output['im_data']
     objects_per_file = 50 
 
     # initialise variables
@@ -232,31 +233,32 @@ def compute_intersection_QC(output, transects, settings):
     # loop through each shoreline
     n = len(shorelines)
     last_obj_idx = 0
-    if settings["plot_sat"]: im_data = load_objects(settings, last_obj_idx, objects_per_file, n, "im_data", "im_data")
+    if settings["plot_sat"]: im_rgbs = load_objects(settings, last_obj_idx, objects_per_file, n, "im_rgb", "im_rgb")
     for sl_idx in range(len(shorelines)):
         print(f'\rProcessing shoreline {sl_idx + 1} out of {str(n)}...', end='')
         sl = shorelines[sl_idx]
         sl_norm = sl_norms[sl_idx]
+        im_datum = im_data[sl_idx]
 
-        # load next cloud kd tree file
+        # load object file
         cur = sl_idx // objects_per_file
         if cur != last_obj_idx:
-            if settings["plot_sat"]: im_data = load_objects(settings, cur, objects_per_file, n, "im_data", "im_data")
+            if settings["plot_sat"]: im_rgbs = load_objects(settings, cur, objects_per_file, n, "im_rgb", "im_rgb")
             last_obj_idx = cur
 
         if settings.get('CASS', False):
             obj_idx = sl_idx - objects_per_file * last_obj_idx
             if settings.get('plot_sat', False):
-                im_datum = im_data[obj_idx]
+                im_rgb = im_rgbs[obj_idx]
             else:
-                im_datum = None
+                im_rgb = None
 
-            cache_key = (tuple(np.round(im_datum[1], 6)), tuple(im_datum[2]))
+            cache_key = (tuple(np.round(im_datum[0], 6)), tuple(im_datum[1]))
             if cache_key in transect_cache.keys():
                 pix_transects = transect_cache[cache_key]
             else:
-                transects_0_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,0,:], settings["output_epsg"], im_datum[2]), im_datum[1])
-                transects_1_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,1,:], settings["output_epsg"], im_datum[2]), im_datum[1])
+                transects_0_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,0,:], settings["output_epsg"], im_datum[1]), im_datum[0])
+                transects_1_pxl = SDS_tools.convert_world2pix(SDS_tools.convert_epsg(ts[:,1,:], settings["output_epsg"], im_datum[1]), im_datum[0])
                 pix_transects = np.swapaxes(np.stack([transects_0_pxl, transects_1_pxl]), 0, 1)
                 transect_cache[cache_key] = pix_transects
 
@@ -284,7 +286,8 @@ def compute_intersection_QC(output, transects, settings):
 
                 # plot intersections and other clustering alg related info
                 if key in settings.get('transects_to_plot', []): # and c_info > 0:
-                    CASS_V2.plot_intersections(key, sl, intersecting_sl, normals, dotprods, transects[key], str(output['dates'][sl_idx])[:10], settings, im_datum)
+                    CASS_V2.plot_intersections(key, sl, intersecting_sl, normals, dotprods, transects[key],
+                                               str(output['dates'][sl_idx])[:10], settings, im_datum, im_rgb)
 
             # compute std, median, max, min of the intersections (for current transect-shoreline pair)
             std_intersect[sl_idx, transect_idx] = np.nanstd(intersections)
