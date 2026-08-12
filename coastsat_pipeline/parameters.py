@@ -116,8 +116,7 @@ class Parameters:
         "plot_cloud_cover": True, # plot histogram of cloud cover percentages of each image
 
         # saving pkl files (coordinate with transect_settings)
-        "save_cloud_kdtrees": True, # must be True if cloud_filtering
-        "save_sat_rgb": False, # must be True if plot_sat
+        "save_sat_rgb": True, # must be True if plot_sat
     }
 
     #####################
@@ -145,7 +144,6 @@ class Parameters:
         "plot_1d": False, # add plot showing projected intersection points (not implemented for CASS_V2)
         "plot_sat": False, # add satellite image as basemap
 
-        "plot_n_clusters": True, # plot number of clusters and transect class on time series for each transect
         "plot_rejection_counts": True, # plot why intersections were rejected, for each transect and each shoreline (before outlier rejection)
     }
 
