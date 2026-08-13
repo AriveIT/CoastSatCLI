@@ -38,7 +38,7 @@ from datetime import datetime, timedelta
 from pylab import ginput
 
 # CoastSat modules
-from coastsat import SDS_tools, SDS_preprocess, CASS, CASS_V2
+from coastsat import SDS_tools, SDS_preprocess, CASS_V2
 
 np.seterr(all='ignore') # raise/ignore divisions by 0 and nans
 # Main function for batch shoreline detection

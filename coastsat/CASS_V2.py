@@ -185,10 +185,10 @@ def process_shoreline(contours, normals, cloud_mask, im_nodata, georef, image_ep
 # Plotting
 #############################################################################
 
-def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, date, settings, im_datum, im_rgb):
+def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, date, settings, im_datum, im_rgb, median):
     col = {
         "sl": "black",
-        "transect": "tab:red",
+        "transect": "black",
         "centroid": "darkorchid",
         "cloud": 'cyan',
         "contrast": 'white' # to make features POP
@@ -202,7 +202,7 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
     fig, ax = plt.subplots(figsize=(12, 8))
 
     sc = plot_basic_intersections(ax, sl, intersecting_sl, sl_norms, dotprods, settings["output_epsg"],
-                                  transect_p0, transect_p1, collider, im_datum, im_rgb, col)
+                                  transect_p0, transect_p1, collider, im_datum, im_rgb, col, median)
 
     # finalize plot
     leg_ax = ax
@@ -219,7 +219,7 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
     fig.savefig(f"{filepath}\\{key}_{date}.png")
     plt.close(fig)
 
-def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, transect_p0, transect_p1, collider, im_datum, im_rgb, col):
+def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, transect_p0, transect_p1, collider, im_datum, im_rgb, col, median):
     georef, image_epsg = im_datum
 
     # convert to image space to be consistent with norms
@@ -231,7 +231,6 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
     sl = conv(sl)
     if im_rgb is not None:
         ax.imshow(im_rgb)
-
 
     cmap = plt.get_cmap('coolwarm')
 
@@ -245,9 +244,12 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
     for i in range(len(int_sl)):
         ax.plot([int_sl[i,1], int_sl[i,1] + 5*sl_norms[i,1]], [int_sl[i,0], int_sl[i,0] + 5*sl_norms[i,0]], c=cmap(norm(dotprods[i])))
 
-
     # plot collider
     ax.plot(collider[1], collider[0], c=col["transect"], linewidth=1.5)
+
+    # plot median
+    median = get_point_along_transect(transect_p0, transect_p1, median / georef[1])
+    ax.scatter(median[1], median[0], s=30, c="white", zorder=100)
 
     # for better visibility
     x_lim, y_lim = get_plot_range(collider)
@@ -260,6 +262,11 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
     if im_datum is not None: ax.invert_yaxis()
 
     return sc
+
+def get_point_along_transect(p0, p1, point):
+    d = p1 - p0
+    norm = d / np.linalg.norm(d)
+    return p0 + point * norm
 
 def get_transect_collider(p0, p1, min_chainage, past_dist, along_dist):
     d = p1 - p0

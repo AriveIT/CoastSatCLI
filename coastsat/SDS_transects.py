@@ -25,7 +25,7 @@ from scipy import stats
 from scipy.spatial import cKDTree
 
 # CoastSat modules
-from coastsat import SDS_tools, CASS, CASS_V2
+from coastsat import SDS_tools, CASS_V2
 
 # Global variables
 DAYS_IN_YEAR = 365.2425
@@ -287,7 +287,7 @@ def compute_intersection_QC(output, transects, settings):
                 # plot intersections and other clustering alg related info
                 if key in settings.get('transects_to_plot', []): # and c_info > 0:
                     CASS_V2.plot_intersections(key, sl, intersecting_sl, normals, dotprods, transects[key],
-                                               str(output['dates'][sl_idx])[:10], settings, im_datum, im_rgb)
+                                               str(output['dates'][sl_idx])[:10], settings, im_datum, im_rgb, np.nanmedian(intersections))
 
             # compute std, median, max, min of the intersections (for current transect-shoreline pair)
             std_intersect[sl_idx, transect_idx] = np.nanstd(intersections)
