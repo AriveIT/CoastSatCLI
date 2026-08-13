@@ -115,8 +115,8 @@ class Parameters:
         "save_detection_plots": True, # plot RGB, pixel classification, MNDWI, and extracted shoreline
         "plot_cloud_cover": True, # plot histogram of cloud cover percentages of each image
 
-        # saving pkl files (coordinate with transect_settings)
-        "save_sat_rgb": True, # must be True if plot_sat
+        # saving pkl files
+        "save_sat_rgb": False, # must be True if plot_sat
     }
 
     #####################
