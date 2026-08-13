@@ -179,7 +179,7 @@ def extract_shorelines(metadata, settings, print_errors=False):
             # CASS_V2.plot_normals(contours_mwi, norms, filenames[i][:19]+"before")
 
             shoreline, norms = CASS_V2.process_shoreline(contours_mwi, norms, cloud_mask_adv, im_nodata,
-                                          georef, image_epsg, settings, filenames[i][:19])
+                                          georef, image_epsg, settings)
 
             if settings['check_detection'] or settings['save_detection_plots']:
                 date = filenames[i][:19]

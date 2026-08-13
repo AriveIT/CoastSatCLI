@@ -135,7 +135,7 @@ class Parameters:
         "max_range": 30, # maximum range of intersections per transect (exceptions are dealt with according to multiple_inter)
 
         # clustering shoreline selection settings
-        "CASS": True, # use clustering intersection algorithm
+        "CASS": True, # use shoreline selection algorithm
         "clustering_threshold": 20, # minimum gap between adjacent intersections needed to start new cluster
         
         # clustering shoreline selection plotting

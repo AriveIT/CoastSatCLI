@@ -141,7 +141,7 @@ def plot_normals(contours, normals, date, norm_mult=5):
 Author: Kilian Vos, Water Research Laboratory, University of New South Wales
 Modified to also filter the associated normals
 """
-def process_shoreline(contours, normals, cloud_mask, im_nodata, georef, image_epsg, settings, date):
+def process_shoreline(contours, normals, cloud_mask, im_nodata, georef, image_epsg, settings):
 
     # Step 1: Convert contours to world coordinates and reproject
     contours_world = SDS_tools.convert_pix2world(contours, georef)
@@ -200,6 +200,7 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
 
     # init plots
     fig, ax = plt.subplots(figsize=(12, 8))
+    ax.set_title(f"{key} on {date}")
 
     sc = plot_basic_intersections(ax, sl, intersecting_sl, sl_norms, dotprods, settings["output_epsg"],
                                   transect_p0, transect_p1, collider, im_datum, im_rgb, col, median)
@@ -236,9 +237,10 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
 
     # plot shoreline and transect
     norm = TwoSlopeNorm(vcenter=0)
-    ax.scatter(sl[:,1], sl[:,0], c="black", s=5)
-    sc = ax.scatter(int_sl[:, 1], int_sl[:, 0], c=dotprods, s=7, cmap=cmap, norm=norm, label="shoreline")
+    ax.scatter(sl[:,1], sl[:,0], c=col["sl"], s=5, label="shoreline")
+    sc = ax.scatter(int_sl[:, 1], int_sl[:, 0], c=dotprods, s=7, cmap=cmap, norm=norm)
     ax.plot([transect_p0[1], transect_p1[1]], [transect_p0[0], transect_p1[0]], label="transect", c=col["transect"])
+    ax.scatter(transect_p0[1], transect_p0[0], s=30, c=col["transect"])
 
     # plot normals
     for i in range(len(int_sl)):
@@ -249,7 +251,7 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
 
     # plot median
     median = get_point_along_transect(transect_p0, transect_p1, median / georef[1])
-    ax.scatter(median[1], median[0], s=30, c="white", zorder=100)
+    ax.scatter(median[1], median[0], s=30, c=col["contrast"], edgecolor=col["transect"], zorder=10, label="selection")
 
     # for better visibility
     x_lim, y_lim = get_plot_range(collider)
