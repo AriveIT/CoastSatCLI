@@ -52,7 +52,7 @@ def evaluate_methods(
         optimal_thresholds=False,
         spectral_unmixing=False):
     
-    if ensemble1 in index_functions or ensemble2 in index_functions:
+    if ens1 in index_functions or ens2 in index_functions:
         assert ensemble_index_functions
     assert not (lse1 and lse2)
 
@@ -60,7 +60,7 @@ def evaluate_methods(
     if smooth:
         sim_bands = smooth_bands(sim_bands)
     if lse1 or lse2:
-        coords_pxl = SDS_tools.convert_world2pix(ref_sl_points[::int(le_spacing // 0.5)], sds_data["georef"])
+        coords_pxl = modified_coastsat.convert_world2pix(ref_sl_points[::int(le_spacing // 0.5)], sds_data["georef"])
 
     thresholds = []
     shoreline_metric = []
@@ -70,15 +70,15 @@ def evaluate_methods(
             im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
 
             # compute index
-            if index_fn == ensemble1:
-                index = ensemble1(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
-            elif index_fn == ensemble2:
-                index = ensemble2(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
-            elif index_fn == "spectral_unmixing_1":
-                im_ind = ensemble2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
+            if index_fn == ens1:
+                index = ens1(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
+            elif index_fn == ens2:
+                index = ens2(sim_bands, ensemble_index_functions, thresh_fn, sds_data["cloud_mask"], sds_data["sl_buffer"]).flatten()
+            elif index_fn == "su1":
+                im_ind = ens2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
                 index = su.spectral_unmixing_1(sim_bands, im_ind, sds_data)
-            elif index_fn == "spectral_unmixing_2":
-                im_ind = ensemble2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
+            elif index_fn == "su2":
+                im_ind = ens2(sim_bands, ensemble_index_functions, otsu, sds_data["cloud_mask"], sds_data["sl_buffer"])
                 index = su.spectral_unmixing_2(sim_bands, im_ind, sds_data)
                 index[index < 0.6] = np.nan
                 

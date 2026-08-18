@@ -3,9 +3,9 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 
-from general_utils import metrics as m
+from general_utils import metrics as m, modified_coastsat
 from wv3_utils import wv_eval
-from coastsat import SDS_tools
+from coastsat import SDS_tools, SDS_preprocess
 
 def plot_transect_metric(metric, outlier_thresholds, transects_pix, ref_sl_points_pxl, im_rgb, contours_pxl=None, s=None):
     s = s or 1
@@ -54,7 +54,6 @@ def plot_shoreline_metric(metric, outlier_thresholds, ref_sl_points_pxl, im_rgb,
     min_dist, max_dist = np.min(dists_no_outliers), np.max(dists_no_outliers)
     cmap = mpl.cm.cool
     col = cmap((dists_no_outliers - min_dist) / (max_dist - min_dist))
-
     fig, ax = plt.subplots(figsize=(20, 10))
     ax.axis(False)
     ax.set_title(title)
@@ -153,14 +152,17 @@ def plot_comparison_barplot(entries_arr, titles, plot_title):
     ax[-1].set_xticks(x + .5 * (len(titles) - 1) * width, methods, rotation='vertical')
     return fig
 
-def plot_method(index, threshold, method, sim_bands, sds_data, ref_sl_points, ref_sl_points_pxl, transects, collider_settings, outlier_idx, georef, sitename, sim_sat):
+def plot_method(index, threshold, method, sim_bands, sds_data, ref_sl_points, ref_sl_points_pxl, transects, transects_pix, collider_settings, outlier_idx, georef, sitename, sim_sat):
     contours = wv_eval.get_contours(index.reshape(sim_bands.shape[:-1]), threshold, sds_data)
     sl_dists = m.get_nearest_distance(ref_sl_points, contours)
     t_dists, _ = m.get_median_distances(transects, ref_sl_points, contours, collider_settings)
-
-    contour_pxl = SDS_tools.convert_world2pix(contours, georef)
-    title = sitename + "_" + sim_sat + "_" + method + f": sl_mean: {np.mean(sl_dists[~outlier_idx]):.3f}, {np.mean(sl_dists):.3f}; t_mae: {np.nanmean(np.abs(t_dists)):.3f}"
-    return plot_shoreline_metric(sl_dists, (0, 25), ref_sl_points_pxl, sim_bands[:,:,[2, 1, 0]], title, contours_pxl=contour_pxl)
+    contour_pxl = modified_coastsat.convert_world2pix(contours, georef)
+    # title = sitename + "_" + sim_sat + "_" + method + f": sl_mean: {np.mean(sl_dists[~outlier_idx]):.3f}, {np.mean(sl_dists):.3f}; t_mae: {np.nanmean(np.abs(t_dists)):.3f}"
+    title = sitename + " " + sim_sat + ": " + method
+    im_rgb = SDS_preprocess.rescale_image_intensity(sim_bands[:,:,[2,1,0]], np.zeros(sim_bands.shape[:2]).astype(bool), 99.9)
+    sl_fig = plot_shoreline_metric(sl_dists, (0, 25), ref_sl_points_pxl, im_rgb, title, contours_pxl=contour_pxl)
+    t_fig = plot_transect_metric(t_dists, (-25, 25), transects_pix, ref_sl_points_pxl, im_rgb, contours_pxl=contour_pxl)
+    return sl_fig, t_fig
 
 ###############################
 # Best Method Functions
@@ -197,8 +199,8 @@ def plot_best_method_per_point(idx, methods, ref_sl_points_pxl, im_rgb, sitename
     ax.scatter(ref_sl_points_pxl[:,0], ref_sl_points_pxl[:,1], c=cmap(idx/(len(methods) - 1)), cmap=cmap, s=1)
     ax.imshow(im_rgb, interpolation=None)
     
-    legend_elements = [Patch(facecolor=cmap(i/(len(methods) - 1)), label=methods[i]) for i in range(len(methods))]
-    ax.legend(handles=legend_elements, loc="upper right")
+    # legend_elements = [Patch(facecolor=cmap(i/(len(methods) - 1)), label=methods[i]) for i in range(len(methods))]
+    # ax.legend(handles=legend_elements, loc="upper right")
     
     return fig
 
@@ -240,12 +242,12 @@ def plot_best_method_per_transect(idx, methods, transects_pix, ref_sl_points_pxl
     for i in range(len(transects_pix)):
         ax.plot(transects_pix[i,:,0], transects_pix[i,:,1], c=cmap(idx[i]/(len(methods) - 1)))
     
-    legend_elements = [Patch(facecolor=cmap(i/(len(methods) - 1)), label=methods[i]) for i in range(len(methods))]
-    ax.legend(handles=legend_elements, loc="upper right")
+    # legend_elements = [Patch(facecolor=cmap(i/(len(methods) - 1)), label=methods[i]) for i in range(len(methods))]
+    # ax.legend(handles=legend_elements, loc="upper right")
     
     return fig
 
-def violin_plots(metric, methods, title, ylim=None, outlier_idx=None, box_instead=False, sort_methods=False):
+def violin_plots(metric, methods, title, ylim=None, outlier_idx=None, box_instead=False, sort_methods=False, top=10):
     no_outlier_performances = []
     valid_methods = []
     means = []
@@ -260,8 +262,8 @@ def violin_plots(metric, methods, title, ylim=None, outlier_idx=None, box_instea
 
     if sort_methods:
         sorted_idx = np.argsort(means)
-        no_outlier_performances = [no_outlier_performances[idx] for idx in sorted_idx]
-        valid_methods = [valid_methods[idx] for idx in sorted_idx]
+        no_outlier_performances = [no_outlier_performances[idx] for idx in sorted_idx[:top]]
+        valid_methods = [valid_methods[idx] for idx in sorted_idx[:top]]
 
     fig, ax = plt.subplots(figsize=(16, 8), tight_layout=True)
     ax.set_title(title)
@@ -286,6 +288,32 @@ def plot_best_method_counts(best_per_unit_idx, methods, title, pie_instead=False
         wedges, texts = ax.pie(counts, colors=cmap(np.arange(len(methods)) / (len(methods)-1))[idx])
         # ax.legend(wedges, methods[idx], ncols=3)
     return fig
+
+def plot_pareto_front(metric1, metric2, name1, name2, methods):
+    pareto_frontier = pareto_front(np.stack([metric1, metric2], axis=1))
+    fig, ax = plt.subplots()
+    ax.scatter(metric1, metric2, c=pareto_frontier)
+    ax.set(
+        xlabel=name1,
+        ylabel=name2,
+        title=f"Pareto Frontier for {name1} and {name2}"
+    )
+
+
+    for i in np.nonzero(pareto_frontier)[0]:
+        ax.annotate(methods[i], (metric1[i], metric2[i]))
+
+    return fig
+
+def pareto_front(costs):
+    is_pareto_efficient = np.zeros(costs.shape[0])
+
+    for i in range(costs.shape[0]):
+        cond = costs[i] > costs
+        is_pareto_efficient[i] = not np.any(np.logical_and.reduce(cond, axis=1))
+
+    return is_pareto_efficient
+
 
 #######################
 # Helpers

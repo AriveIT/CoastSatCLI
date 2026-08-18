@@ -124,7 +124,11 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 error_skipped += 1
                 continue
 
-            im_ms = im_ms[:,:,:5] # to support using 6 band imagery from other workflows
+            try:
+                im_ms = im_ms[:,:,:5] # to support using 6 band imagery from other workflows
+            except Exception as e:
+                if print_errors: print(f'\nCould not slice this image: {filenames[i]}, reason: {e}')
+                error_skipped += 1
             # plot_cloud_masks(im_ms, cloud_mask, settings, filenames[i][:19])
 
             image_epsg = metadata[satname]['epsg'][i]

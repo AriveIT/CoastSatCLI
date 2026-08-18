@@ -2,7 +2,7 @@ import numpy as np
 from scipy.spatial import KDTree
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import general_utils.modified_coastsat
+from general_utils import modified_coastsat
 
 
 #################################

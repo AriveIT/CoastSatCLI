@@ -24,7 +24,7 @@ def zero(im, cloud_mask, ref_buffer):
 
 # from Shoreliner
 # finds minimum between the main peak on either side of the otsu threshold
-def local_min_otsu(im, cloud_mask, ref_buffer):
+def lmo(im, cloud_mask, ref_buffer):
     vec = apply_buffer_and_mask(im, cloud_mask, ref_buffer)
     n_bins = 256
     hist, bins = np.histogram(vec, n_bins, density=True)

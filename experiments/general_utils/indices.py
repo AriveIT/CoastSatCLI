@@ -67,7 +67,7 @@ def ddwi(sample):
 ################
 # Ensemble
 ################
-def ensemble1(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
+def ens1(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
     ensemble_index = np.zeros(sim_bands.shape[:-1])
     for ind_func in ensemble_index_functions:
         im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
@@ -82,7 +82,7 @@ def ensemble1(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buf
 
     return ensemble_index / len(ensemble_index_functions)
 
-def ensemble2(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
+def ens2(sim_bands, ensemble_index_functions, thresh_fn, cloud_mask, sl_buffer):
     ensemble_index = np.zeros(sim_bands.shape[:-1])
     im_flat = sim_bands.reshape(-1, sim_bands.shape[-1])
 

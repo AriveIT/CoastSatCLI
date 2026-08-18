@@ -20,6 +20,7 @@ import skimage.measure as measure
 import sklearn.decomposition as decomposition
 from scipy.spatial import cKDTree
 import sklearn
+import skimage.transform as transform
 
 from osgeo import gdal
 from pyproj import CRS
@@ -27,7 +28,7 @@ from pylab import ginput
 
 # coastsat modules
 sys.path.insert(0, os.pardir)
-from coastsat import SDS_download, SDS_preprocess, SDS_shoreline, SDS_tools, SDS_classify
+from coastsat import SDS_download, SDS_preprocess, SDS_shoreline, SDS_tools, SDS_classify, CASS_V2
 
 from experiments.general_utils import spectral_unmixing as su, indices, thresholding
 
@@ -1055,13 +1056,13 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
         output_timestamp = []
         output_shoreline = []
+        output_shoreline_norms = []
         output_filename = []
         output_cloudcover = []
         output_geoaccuracy = []
         output_idxkeep = []
         output_t_mndwi = []
-        output_transect_origin_classes = []
-        output_cloud_kdtrees = []
+        output_im_data = []
 
         settings['min_length_sl'] = 200 if satname == 'L7' else default_min_length_sl
 
@@ -1116,14 +1117,14 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
             im_mndwi = None
             try:
-                im_ind = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
-                sds_data = {
-                    "cloud_mask": cloud_mask,
-                    "sl_buffer": im_ref_buffer
-                }
-                im_mndwi = su.spectral_unmixing_1(im_ms, im_ind, sds_data).reshape(cloud_mask.shape)
-                # im_mndwi = indices.ewi(im_ms.reshape(-1, im_ms.shape[-1])).reshape(cloud_mask.shape)
-                # im_mndwi = indices.ensemble2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
+                # im_ind = indices.ens2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
+                # sds_data = {
+                #     "cloud_mask": cloud_mask,
+                #     "sl_buffer": im_ref_buffer
+                # }
+                # im_mndwi = su.spectral_unmixing_1(im_ms, im_ind, sds_data).reshape(cloud_mask.shape)
+                im_mndwi = indices.ewi(im_ms.reshape(-1, im_ms.shape[-1])).reshape(cloud_mask.shape)
+                # im_mndwi = indices.ens2(im_ms, indices.get_ensemble_list(), thresholding.otsu, cloud_mask, im_ref_buffer)
                 
                 t_mndwi = thresholding.otsu(im_mndwi, cloud_mask, im_ref_buffer)
                 contours_mwi = find_wl_contours1(im_mndwi, cloud_mask, im_ref_buffer, t_mndwi)
@@ -1137,7 +1138,10 @@ def extract_shorelines(metadata, settings, print_errors=False):
                 error_skipped += 1
                 continue
 
-            shoreline = SDS_shoreline.process_shoreline(contours_mwi, cloud_mask_adv, im_nodata,
+            norms = CASS_V2.calc_shoreline_normals(contours_mwi)
+            # CASS_V2.plot_normals(contours_mwi, norms, filenames[i][:19]+"before")
+
+            shoreline, norms = CASS_V2.process_shoreline(contours_mwi, norms, cloud_mask_adv, im_nodata,
                                           georef, image_epsg, settings)
 
             if settings['check_detection'] or settings['save_detection_plots']:
@@ -1154,36 +1158,28 @@ def extract_shorelines(metadata, settings, print_errors=False):
             # determine if transect origins are on land or water
             if im_mndwi is None: im_mndwi = SDS_tools.nd_index(im_ms[:,:,4], im_ms[:,:,1], cloud_mask)
             if settings.get("plot_mndwi", False): SDS_shoreline.plot_mndwi_hist(im_mndwi, t_mndwi, filenames[i][:19], settings)
-            on_water = SDS_shoreline.get_transect_classes(transects, im_mndwi, t_mndwi, cloud_mask, settings, georef, filenames[i], image_epsg)
-
-            # build cloud mask kd tree
-            cloud_idx = np.column_stack(np.where(cloud_mask))
-            cloud_coords = SDS_tools.convert_pix2world(cloud_idx, georef)
-            cloud_coords = SDS_tools.convert_epsg(cloud_coords, image_epsg, settings['output_epsg'])
-            cloud_kdtree = cKDTree(cloud_coords)
 
             output_timestamp.append(metadata[satname]['dates'][i])
             output_shoreline.append(shoreline)
+            output_shoreline_norms.append(norms)
             output_filename.append(filenames[i])
             output_cloudcover.append(cloud_cover)
             output_geoaccuracy.append(metadata[satname]['acc_georef'][i])
             output_idxkeep.append(i)
             output_t_mndwi.append(t_mndwi)
-            output_transect_origin_classes.append(on_water)
+            output_im_data.append((georef, image_epsg))
             
-            # for cloud intersections
-            output_cloud_kdtrees.append(cloud_kdtree)
 
         output[satname] = {
             'dates': output_timestamp,
             'shorelines': output_shoreline,
+            'shoreline_norms': output_shoreline_norms,
             'filename': output_filename,
             'cloud_cover': output_cloudcover,
             'geoaccuracy': output_geoaccuracy,
             'idx': output_idxkeep,
             'MNDWI_threshold': output_t_mndwi,
-            'transect_origin_classes': output_transect_origin_classes,
-            'cloud_kdtrees': output_cloud_kdtrees,
+            'im_data': output_im_data
         }
 
         print()
@@ -1201,11 +1197,52 @@ def extract_shorelines(metadata, settings, print_errors=False):
 
     filepath = filepath_data
 
-    # save cloud kdtrees in multiple files so they can be loaded separately for better memory usage
-    SDS_shoreline.save_objects(output["cloud_kdtrees"], 50, filepath, sitename, "kdtrees", "cloud_kdtrees")
-    del(output["cloud_kdtrees"])
-
     with open(os.path.join(filepath, sitename + '_output.pkl'), 'wb') as f:
         pickle.dump(output, f)
 
     return output
+
+def convert_world2pix(points, georef):
+    """
+    Converts world projected coordinates (X,Y) to image coordinates 
+    (pixel row and column) performing an affine transformation.
+    
+    KV WRL 2018
+
+    Arguments:
+    -----------
+    points: np.array or list of np.array
+        array with 2 columns (X,Y)
+    georef: np.array
+        vector of 6 elements [Xtr, Xscale, Xshear, Ytr, Yshear, Yscale]
+                
+    Returns:    
+    -----------
+    points_converted: np.array or list of np.array 
+        converted coordinates (pixel row and column)
+    
+    """
+    
+    # make affine transformation matrix
+    aff_mat = np.array([[georef[1], georef[2], georef[0]],
+                       [georef[4], georef[5], georef[3]],
+                       [0, 0, 1]])
+    # create affine transformation
+    tform = transform.AffineTransform(aff_mat)
+    
+    # if list of arrays
+    if type(points) is list:
+        points_converted = []
+        # iterate over the list
+        for i, arr in enumerate(points): 
+            points_converted.append(tform.inverse(arr))#[:,[1,0]])
+            
+    # if single array    
+    elif type(points) is np.ndarray:
+        points_converted = tform.inverse(points)#[:,[1,0]]
+        
+    else:
+        print('invalid input type')
+        raise
+        
+    return points_converted

@@ -29,7 +29,7 @@ def local_sl_extraction_2(masks, thresh_func, im_ind, zone_indicators, coords_px
 
         contours = SDS_shoreline.process_shoreline(contours, sds_data["cloud_mask"], sds_data["im_nodata"],
                                         sds_data["georef"], sds_data["image_epsg"], sds_data["sds_settings"])
-        contours_pxl = SDS_tools.convert_world2pix(contours, sds_data["georef"])
+        contours_pxl = modified_coastsat.convert_world2pix(contours, sds_data["georef"])
         
         contours_pxl = filter_contour_points_2(contours_pxl, ref_tree, zone_indicators, cur_zone=i)
         if len(contours_pxl) > 0: final_contour.append(contours_pxl)
@@ -116,7 +116,7 @@ def local_sl_extraction_su(sim_bands, masks, thresh_func, sds_data, im_ind=None,
 
         contours = SDS_shoreline.process_shoreline(contours, sds_data["cloud_mask"], sds_data["im_nodata"],
                                         sds_data["georef"], sds_data["image_epsg"], sds_data["sds_settings"])
-        contours_pxl = SDS_tools.convert_world2pix(contours, sds_data["georef"])
+        contours_pxl = modified_coastsat.convert_world2pix(contours, sds_data["georef"])
         if len(contours_pxl) > 0: final_contour.append(contours_pxl)
         
     final_contour_pxl = np.concatenate(final_contour)[:,[1,0]]
@@ -153,7 +153,7 @@ def local_sl_extraction_1(coords_pxl, im_ind, thresh_func, buffer_size, sds_data
 
         contours = SDS_shoreline.process_shoreline(contours, sds_data["cloud_mask"], sds_data["im_nodata"],
                                         sds_data["georef"], sds_data["image_epsg"], sds_data["sds_settings"])
-        contours_pxl = SDS_tools.convert_world2pix(contours, sds_data["georef"])
+        contours_pxl = modified_coastsat.convert_world2pix(contours, sds_data["georef"])
 
         # append contour points nearby to reference point (px_idx)
         good_contour_pxl = filter_contour_points(contours_pxl, ref_tree, px_idx)

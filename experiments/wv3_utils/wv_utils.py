@@ -12,7 +12,7 @@ from coastsat import SDS_download, SDS_preprocess, SDS_shoreline, SDS_tools, SDS
 from osgeo import gdal
 gdal.UseExceptions()
 
-import general_utils.modified_coastsat
+from general_utils import modified_coastsat
 
 ##########################
 # Initialization
@@ -55,7 +55,7 @@ def load_ref_sl(path):
 def ref_sl_to_pxl(ref_sl_list, georef):
     ref_sl_pxl_list = []
     for ref_sl in ref_sl_list:
-        ref_sl_pxl_list.append(SDS_tools.convert_world2pix(ref_sl, georef))
+        ref_sl_pxl_list.append(modified_coastsat.convert_world2pix(ref_sl, georef))
 
     return ref_sl_pxl_list 
 
@@ -78,8 +78,8 @@ def load_ref_sl_data(ref_sl_path, georef, sim_bands_shape):
     return ref_sl_points, sl_buffer
 
 def transects_world2pix(transects, georef):
-    transects_0_pxl = SDS_tools.convert_world2pix(transects[:,0,:], georef)
-    transects_1_pxl = SDS_tools.convert_world2pix(transects[:,1,:], georef)
+    transects_0_pxl = modified_coastsat.convert_world2pix(transects[:,0,:], georef)
+    transects_1_pxl = modified_coastsat.convert_world2pix(transects[:,1,:], georef)
     return np.swapaxes(np.stack([transects_0_pxl, transects_1_pxl]), 0, 1)
 
 def crop_to_im_mask(data, sim_bands_shape):
@@ -94,7 +94,7 @@ def init(sim_sat, base_dir, ref_sl_path, transect_path, image_epsg):
 
     # convert transects and reference shoreline to pixel space
     transects_pix = transects_world2pix(transects, georef)
-    ref_sl_points_pxl = SDS_tools.convert_world2pix(ref_sl_points, georef)
+    ref_sl_points_pxl = modified_coastsat.convert_world2pix(ref_sl_points, georef)
 
     # crop shoreline and transects to image (borders changes with kernel width)
     mask = crop_to_im_mask(ref_sl_points_pxl, sim_bands.shape)
