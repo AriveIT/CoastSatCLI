@@ -13,6 +13,7 @@ from itertools import compress
 from coastsat import SDS_tools
 
 # Rejection reasons
+SHORELINE_SELECTED = 0
 NO_VALID_SHORELINE = 1
 AMBIGUOUS_SHORELINE = 2
 DISPERSION = 3
@@ -30,16 +31,16 @@ def shoreline_selection(intersections, normals, transect, clustering_threshold):
 
     # no shorelines facing the right way
     if len(intersections) == 0:
-        return None, None, NO_VALID_SHORELINE
+        return None, dotprods, NO_VALID_SHORELINE
 
     # check if there's multiple valid shorelines
     clusters = cluster1d(intersections, threshold=clustering_threshold)
 
     # more than one valid shoreline
     if len(clusters) > 1:
-        return None, None, AMBIGUOUS_SHORELINE
+        return None, dotprods, AMBIGUOUS_SHORELINE
 
-    return intersections, dotprods, 0
+    return intersections, dotprods, SHORELINE_SELECTED
 
 def cluster1d(intersections, threshold):
     sorted = np.sort(intersections)
@@ -185,7 +186,7 @@ def process_shoreline(contours, normals, cloud_mask, im_nodata, georef, image_ep
 # Plotting
 #############################################################################
 
-def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, date, settings, im_datum, im_rgb, median):
+def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, date, settings, im_datum, im_rgb, intersections):
     col = {
         "sl": "black",
         "transect": "black",
@@ -193,6 +194,8 @@ def plot_intersections(key, sl, intersecting_sl, sl_norms, dotprods, transect, d
         "cloud": 'cyan',
         "contrast": 'white' # to make features POP
     }
+    if intersections is not None: median = np.nanmedian(intersections)
+    else: median = None
 
     transect_p0 = transect[0,:]
     transect_p1 = transect[-1,:]
@@ -236,11 +239,13 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
     cmap = plt.get_cmap('coolwarm')
 
     # plot shoreline and transect
-    norm = TwoSlopeNorm(vcenter=0)
     ax.scatter(sl[:,1], sl[:,0], c=col["sl"], s=5, label="shoreline")
-    sc = ax.scatter(int_sl[:, 1], int_sl[:, 0], c=dotprods, s=7, cmap=cmap, norm=norm)
     ax.plot([transect_p0[1], transect_p1[1]], [transect_p0[0], transect_p1[0]], label="transect", c=col["transect"])
     ax.scatter(transect_p0[1], transect_p0[0], s=30, c=col["transect"])
+
+    # plot intersecting shoreline
+    norm = TwoSlopeNorm(vcenter=0)
+    sc = ax.scatter(int_sl[:, 1], int_sl[:, 0], c=dotprods, s=7, cmap=cmap, norm=norm)
 
     # plot normals
     for i in range(len(int_sl)):
@@ -250,8 +255,9 @@ def plot_basic_intersections(ax, sl, int_sl, sl_norms, dotprods, output_epsg, tr
     ax.plot(collider[1], collider[0], c=col["transect"], linewidth=1.5)
 
     # plot median
-    median = get_point_along_transect(transect_p0, transect_p1, median / georef[1])
-    ax.scatter(median[1], median[0], s=30, c=col["contrast"], edgecolor=col["transect"], zorder=10, label="selection")
+    if median:
+        median = get_point_along_transect(transect_p0, transect_p1, median / georef[1])
+        ax.scatter(median[1], median[0], s=30, c=col["contrast"], edgecolor=col["transect"], zorder=10, label="selection")
 
     # for better visibility
     x_lim, y_lim = get_plot_range(collider)
