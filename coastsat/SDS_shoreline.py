@@ -1115,13 +1115,13 @@ def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, co
 
     # create image 1 (RGB)
     ax1.imshow(im_RGB)
-    ax1.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
+    ax1.plot(sl_pix[:,1], sl_pix[:,0], 'k.', markersize=3)
     ax1.axis('off')
     ax1.set_title(sitename, fontweight='bold', fontsize=12)
 
     # create image 2 (classification)
     ax2.imshow(im_class)
-    ax2.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
+    ax2.plot(sl_pix[:,1], sl_pix[:,0], 'k.', markersize=3)
     ax2.axis('off')
 
     if not plot_extra:
@@ -1135,7 +1135,7 @@ def plot_detection(im_RGB, im_class, im_mwi, sl_pix, date, satname, sitename, co
 
     # create image 3 (MNDWI)
     mwi_plot = ax3.imshow(im_mwi, cmap='bwr')
-    ax3.plot(sl_pix[:,0], sl_pix[:,1], 'k.', markersize=3)
+    ax3.plot(sl_pix[:,1], sl_pix[:,0], 'k.', markersize=3)
     ax3.axis('off')
     ax3.set_title(satname, fontweight='bold', fontsize=12)
     
