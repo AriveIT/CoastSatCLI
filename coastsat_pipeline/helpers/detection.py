@@ -35,25 +35,11 @@ def run_batch_shoreline_detection(
     
     if not options.skip_jpg:
         save_jpg(metadata, settings, options, scene_metrics_manifest, scene_metrics_path)
-    cached_output = load_cached_output(settings, cache_enabled=options.cache_enabled)
-    if cached_output is not None:
+    output = load_cached_output(settings, cache_enabled=options.cache_enabled)
+    if output is not None:
         print("Using cached shorelines extraction output")
-        return cached_output
-
-    # Reload updated metrics and quality config after preprocessing/selection.
-    # scene_metrics_manifest, _ = _load_scene_metrics(settings)
-    # quality_cfg = load_quality_config(settings["inputs"]["filepath"])
-    # preprocessed_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "preprocessed"
-    # quality_skip_dir = Path(settings["inputs"]["filepath"]) / "jpg_files" / "quality_skipped"
-    # metadata = _apply_quality_filter(
-    #     metadata,
-    #     scene_metrics_manifest,
-    #     quality_cfg,
-    #     preprocessed_dir=preprocessed_dir,
-    #     skip_dir=quality_skip_dir,
-    # )
-
-    output = run_detection(metadata, settings)
+    else:
+        output = run_detection(metadata, settings)
 
     if options.save_geojson:
         write_geojson(output, settings)
@@ -144,7 +130,7 @@ def run_detection(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Dict[st
 
 
 def write_geojson(output: Dict[str, Any], settings: Dict[str, Any]) -> None:
-    geomtype = "points"
+    geomtype = "lines"
     gdf = SDS_tools.output_to_gdf(output, geomtype)
     if gdf is None:
         raise RuntimeError("Output does not contain any mapped shorelines")
