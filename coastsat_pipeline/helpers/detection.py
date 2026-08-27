@@ -130,6 +130,7 @@ def run_detection(metadata: Dict[str, Any], settings: Dict[str, Any]) -> Dict[st
 
 
 def write_geojson(output: Dict[str, Any], settings: Dict[str, Any]) -> None:
+    # output = filter_dict(output)
     geomtype = "lines"
     gdf = SDS_tools.output_to_gdf(output, geomtype)
     if gdf is None:
@@ -137,6 +138,16 @@ def write_geojson(output: Dict[str, Any], settings: Dict[str, Any]) -> None:
     gdf.crs = CRS(settings["output_epsg"])
     target = Path(settings["inputs"]["filepath"]) / f"{settings['inputs']['sitename']}_output_{geomtype}.geojson"
     gdf.to_file(target, driver="GeoJSON", encoding="utf-8")
+
+def filter_dict(output):
+    dates = output["dates"]
+    mask = [i for i in range(len(dates)) if dates[i].month == 8]
+
+    filtered_output = {}
+    for key, arr in output.items():
+        filtered_output[key] = [arr[i] for i in mask]
+
+    return filtered_output
 
 
 def plot_mapped_shorelines(output: Dict[str, Any], settings: Dict[str, Any]) -> None:
