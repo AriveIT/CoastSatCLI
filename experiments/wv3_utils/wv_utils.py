@@ -271,10 +271,10 @@ def coreg_tif(fn, name, base_dir, opts, resample_alg):
     gdal.Warp(coreg_fn, fn, **opts, resampleAlg=resample_alg)
     return coreg_fn
 
-def coreg_tifs(base_dir, resample_alg, ref_idx=1):
+def coreg_tifs(base_dir, resample_alg, fns, ref_idx=1):
     names = ["swir", "pan", "ms"]
-    crop_fns = [get_crop_tif_name(name, base_dir) for name in names]
-    infos = [get_raster_info(fn) for fn in crop_fns]
+    fns = fns or [get_crop_tif_name(name, base_dir) for name in names]
+    infos = [get_raster_info(fn) for fn in fns]
     ref_info = infos[ref_idx]
 
     warp_opts = dict(
@@ -286,7 +286,7 @@ def coreg_tifs(base_dir, resample_alg, ref_idx=1):
         format="GTiff",
     )
 
-    coreg_fns = [coreg_tif(fn, name, base_dir, warp_opts, resample_alg) for fn, name in zip(crop_fns, names)]
+    coreg_fns = [coreg_tif(fn, name, base_dir, warp_opts, resample_alg) for fn, name in zip(fns, names)]
 
     return coreg_fns
 
@@ -455,7 +455,7 @@ def get_degraded_tif_name(name, deg_type, base_dir):
     return os.path.join(base_dir, deg_type, f"{name}_degraded.tif")
 
 def get_sim_tif_name(sat, base_dir):
-    return os.path.join(base_dir, "gaussian_deg", sat + "_sim.tif")
+    return os.path.join(base_dir, sat + "_sim.tif")
 
 def get_ps_tif_name(base_dir):
     return os.path.join(base_dir, "pansharpened", f"ms_ps.tif") # can only be ms

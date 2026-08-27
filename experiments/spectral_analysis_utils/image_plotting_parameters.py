@@ -57,6 +57,18 @@ def is_data_function(sitename, key):
 # need Canadian urban area too
 
 #############################
+# rennell-sound (Haida Gwaii)
+#############################
+def rennellsound_download():
+    return {
+        "L5": [datetime(1989, 6, 23)],
+        "L7": [datetime(2001, 8, 10)],
+        "L8": [datetime(2013, 8, 3)],
+        "L9": [datetime(2022, 7, 28)],
+        "S2": [datetime(2017, 8, 9)],
+    }
+
+#############################
 # colombia
 #############################
 def colombia_download():
