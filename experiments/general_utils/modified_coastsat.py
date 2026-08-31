@@ -958,7 +958,7 @@ def pansharpen(im_ms, im_pan, cloud_mask):
     
     # reshape image into vector and apply cloud mask
     vec = im_ms.reshape(im_ms.shape[0] * im_ms.shape[1], im_ms.shape[2])
-    vec_mask = cloud_mask.reshape(im_ms.shape[0] * im_ms.shape[1])
+    vec_mask = cloud_mask.reshape(im_ms.shape[0] * im_ms.shape[1]) | np.logical_or.reduce(np.isnan(vec), axis=1)
     vec = vec[~vec_mask, :]
     # apply PCA to multispectral bands
     pca = decomposition.PCA()

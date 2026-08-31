@@ -31,12 +31,18 @@ def get_gaussian_kernel(radius, variance, res):
 
 # wastes some flops, but it's simple and readable
 def strided_convolution(im, kernel, stride):
+    nan_mask = np.isnan(im) | (im == 0) | (np.isinf(im))
+    print(nan_mask.sum())
+    im[nan_mask] = np.nan
+
     if len(im.shape) == 3:
         if len(kernel.shape) == 2:
             output = np.stack([convolve2d(im[:,:,i], kernel, mode='valid') for i in range(im.shape[-1])], axis=2)
         elif len(kernel.shape) == 3:
             output = np.stack([convolve2d(im[:,:,i], kernel[:,:,i], mode='valid') for i in range(im.shape[-1])], axis=2)
-    elif len(im.shape) == 2: output = convolve2d(im, kernel, mode='valid')
+    elif len(im.shape) == 2:
+        output = convolve2d(im, kernel, mode='valid')
+
     return output[::stride,::stride]
 
 def kernel_deg(bands, source_res, kernel_radius, target_res, kernel=None):
