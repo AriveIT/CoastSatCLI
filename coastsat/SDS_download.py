@@ -46,31 +46,25 @@ def authenticate_and_initialize():
         2. If 1 fails, try to refresh the token using Application Default Credentials
         3. If 2 fails, authenticate manually via the web browser
     """
-    # first try to initialize connection with GEE server with existing token
-    try: 
+
+    # try to refresh token
+    # based on https://stackoverflow.com/questions/53472429/how-to-get-a-gcp-bearer-token-programmatically-with-python
+    try:
+        # import google.auth.transport.requests
+        creds, project = auth.default()
+        # creds.valid is False, and creds.token is None
+        # refresh credentials to populate those
+        auth_req = auth.transport.requests.Request()
+        creds.refresh(auth_req)
+        # initialise GEE session with refreshed credentials
+        ee.Initialize(creds, project=project)
+        print('GEE initialized (refreshed token).')
+    except:
+        # get the user to authenticate manually and initialize the sesion
         _, project = auth.default()
+        ee.Authenticate()
         ee.Initialize(project=project)
-        print('GEE initialized (existing token).')
-    except Exception as e:
-        print(e)
-        # if token is expired, try to refresh it
-        # based on https://stackoverflow.com/questions/53472429/how-to-get-a-gcp-bearer-token-programmatically-with-python
-        try:
-            # import google.auth.transport.requests
-            creds, project = auth.default()
-            # creds.valid is False, and creds.token is None
-            # refresh credentials to populate those
-            auth_req = auth.transport.requests.Request()
-            creds.refresh(auth_req)
-            # initialise GEE session with refreshed credentials
-            ee.Initialize(creds, project=project)
-            print('GEE initialized (refreshed token).')
-        except:
-            # get the user to authenticate manually and initialize the sesion
-            _, project = auth.default()
-            ee.Authenticate()
-            ee.Initialize(project=project)
-            print('GEE initialized (manual authentication).')
+        print('GEE initialized (manual authentication).')
             
 def retrieve_images(inputs):
     """
